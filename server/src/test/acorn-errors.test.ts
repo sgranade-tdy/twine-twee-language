@@ -90,9 +90,12 @@ const testCases: TestCase[] = [
         expectedEnd: 6,
     },
     {
-        description: "generic sweep: numeric literal followed by identifier",
+        description:
+            "generic sweep: numeric literal followed by identifier " +
+            "(updated in phase 02: dejargon rewrites this message)",
         input: "1_",
-        expectedMessage: "Identifier directly after number",
+        expectedMessage:
+            "Missing space between a number and the following identifier",
         expectedStart: 1,
         expectedEnd: 1,
     },
@@ -111,7 +114,7 @@ const testCases: TestCase[] = [
     {
         description:
             "harvested from sugarcube-parser.test.ts's macro-argument fixture " +
-            "\"<<a 'unterminated>>\" -- the JS fragment SugarCube hands to the parser",
+            '"<<a \'unterminated>>" -- the JS fragment SugarCube hands to the parser',
         input: "'unterminated",
         expectedMessage: "Unterminated string constant",
         expectedStart: 0,
@@ -200,6 +203,149 @@ const testCases: TestCase[] = [
         expectedMessage: "Unexpected token; expected '{'",
         expectedStart: 24,
         expectedEnd: 24,
+    },
+
+    // --- Dejargon table (phase 02): plain-language rewrites of Acorn's ---
+    // --- jargon-heavy messages, which never reach the rules above ---
+    {
+        description: "dejargon: assigning to a non-assignable expression",
+        input: "1 = 2",
+        expectedMessage: "Invalid assignment target",
+        expectedStart: 0,
+        expectedEnd: 0,
+    },
+    {
+        description: "dejargon: doubly-parenthesized arrow function parameter",
+        input: "((a), b) => a",
+        expectedMessage:
+            "Parenthesized expression can't be a destructuring target",
+        expectedStart: 1,
+        expectedEnd: 1,
+    },
+    {
+        description:
+            "dejargon: shorthand property assignment outside a pattern",
+        input: "({a = 1})",
+        expectedMessage:
+            "Shorthand property assignment is only valid in a destructuring pattern",
+        expectedStart: 4,
+        expectedEnd: 4,
+    },
+    {
+        description: "dejargon: destructuring pattern with no initializer",
+        input: "let {a} = {}, {b}",
+        expectedMessage: "Destructuring pattern needs an initial value",
+        expectedStart: 17,
+        expectedEnd: 17,
+    },
+    {
+        description: "dejargon: comma after a rest element",
+        input: "let [a, ...b,] = []",
+        expectedMessage: "A rest element can't be followed by a comma",
+        expectedStart: 12,
+        expectedEnd: 12,
+    },
+    {
+        description: "dejargon: rest element with a default value",
+        input: "([...a = []] = [])",
+        expectedMessage: "A rest element can't have a default value",
+        expectedStart: 5,
+        expectedEnd: 5,
+    },
+    {
+        description: "dejargon: setter using rest parameters",
+        input: "let obj = {set a(...args) {}}",
+        expectedMessage: "A setter can't use rest parameters",
+        expectedStart: 17,
+        expectedEnd: 17,
+    },
+    {
+        description: "dejargon: break with no enclosing loop or switch",
+        input: "break",
+        expectedMessage: "Invalid 'break': no enclosing loop or switch",
+        expectedStart: 0,
+        expectedEnd: 0,
+    },
+    {
+        description: "dejargon: continue with no enclosing loop",
+        input: "continue",
+        expectedMessage: "Invalid 'continue': no enclosing loop or switch",
+        expectedStart: 0,
+        expectedEnd: 0,
+    },
+    {
+        description: "dejargon: mixing '??' with '||' without parentheses",
+        input: "a ?? b || c",
+        expectedMessage:
+            "Mixing '??' with '&&' or '||' needs parentheses around one of them",
+        expectedStart: 7,
+        expectedEnd: 7,
+    },
+    {
+        description: "dejargon: duplicate '__proto__' property",
+        input: "({__proto__: 1, __proto__: 2})",
+        expectedMessage: "Duplicate '__proto__' property",
+        expectedStart: 16,
+        expectedEnd: 16,
+    },
+    {
+        description:
+            "dejargon: getter used as a destructuring assignment target",
+        input: "({get a() {}} = {})",
+        expectedMessage:
+            "A destructuring pattern can't contain a getter or setter",
+        expectedStart: 6,
+        expectedEnd: 6,
+    },
+    {
+        description: "dejargon: optional chaining on an assignment's left side",
+        input: "a?.b = 1",
+        expectedMessage: "'?.' can't appear on the left side of an assignment",
+        expectedStart: 0,
+        expectedEnd: 0,
+    },
+    {
+        description: "dejargon: optional chaining before 'new'",
+        input: "new a?.b()",
+        expectedMessage: "'?.' can't appear before 'new'",
+        expectedStart: 5,
+        expectedEnd: 5,
+    },
+    {
+        description: "dejargon: optional chaining before a tagged template",
+        input: "a?.b`template`",
+        expectedMessage: "'?.' can't appear before a tagged template",
+        expectedStart: 4,
+        expectedEnd: 4,
+    },
+    {
+        description: "dejargon: escaped character inside a keyword",
+        input: "function f() { 'use strict'; \\u0069f (1) {} }",
+        expectedMessage: "Invalid escape sequence in the keyword 'if'",
+        expectedStart: 29,
+        expectedEnd: 29,
+    },
+    {
+        description: "dejargon: duplicate parameter name",
+        input: "function f(a, a) { 'use strict'; }",
+        expectedMessage: "Duplicate parameter name",
+        expectedStart: 14,
+        expectedEnd: 14,
+    },
+    {
+        description: "dejargon: 'use strict' with a non-simple parameter list",
+        input: "function f({a}) { 'use strict'; }",
+        expectedMessage:
+            "'use strict' can't be used with default, rest, or destructured parameters",
+        expectedStart: 0,
+        expectedEnd: 0,
+    },
+    {
+        description: "dejargon: 'new super()' outside a subclass constructor",
+        input: "class C extends D { constructor() { new super(); } }",
+        expectedMessage: "'new' can't be used with 'super'",
+        expectedStart: 40,
+        expectedEnd: 40,
     },
 
     // --- Known-wrong behaviour, recorded as-is ---

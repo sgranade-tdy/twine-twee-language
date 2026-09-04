@@ -1,3 +1,5 @@
+import { dejargon } from "./dejargon";
+
 const endOfUnterminatedStringRegex = /(\\?)(?:\r?\n|$)/g;
 
 /**
@@ -146,11 +148,12 @@ export function improveAcornErrorMessage(
     let pos = err.pos ?? 0;
     const originalMessage = err.message;
 
-    // Get rid of Acorn's position information "(line, char)"
+    // Get rid of Acorn's position information "(line, char)", then rewrite
+    // any jargon-heavy messages that the rules below never touch.
     const improvedError = {
         contents: "",
         at: pos,
-        message: originalMessage.replace(/\s*\(.*?\)\s*$/, ""),
+        message: dejargon(originalMessage.replace(/\s*\(.*?\)\s*$/, "")),
     };
 
     if (
@@ -162,13 +165,11 @@ export function improveAcornErrorMessage(
     }
 
     // The only other messages we tweak are for generic messages
-    if (
-        !(
-            originalMessage.startsWith("Unexpected token") ||
-            originalMessage.startsWith("Unexpected character") ||
-            originalMessage.includes("Unexpected token")
-        )
-    )
+    if (!(
+        originalMessage.startsWith("Unexpected token") ||
+        originalMessage.startsWith("Unexpected character") ||
+        originalMessage.includes("Unexpected token")
+    ))
         return improvedError;
 
     // Unmatched delimiters
