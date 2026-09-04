@@ -6,11 +6,6 @@ import * as uut from "../acorn-errors";
 
 /**
  * One row of the baseline corpus.
- *
- * `expectedEnd` is derived from `contents.length`, mirroring the disguise
- * described in the spec: `createDiagnosticFor` builds a diagnostic's end
- * position from the improved error's `contents` string length, not from a
- * real end offset.
  */
 interface TestCase {
     description: string;
@@ -422,8 +417,8 @@ describe("Acorn Error Messages", () => {
             const result = uut.improveAcornErrorMessage(input, err);
 
             expect(result.message).to.equal(expectedMessage);
-            expect(result.at).to.equal(expectedStart);
-            expect(result.at + result.contents.length).to.equal(expectedEnd);
+            expect(result.start).to.equal(expectedStart);
+            expect(result.end).to.equal(expectedEnd);
         });
     }
 });

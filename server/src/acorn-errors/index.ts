@@ -129,7 +129,9 @@ const incompleteCatchRegex = /\b(catch)(\s*)$/d;
  *
  * @param text Text containing the error.
  * @param err Error as reported by Acorn.
- * @returns Updated diagnostic.
+ * @param offset Document offset at which `text` begins, used to rebase the
+ * returned span into document-relative coordinates.
+ * @returns Updated diagnostic, with a document-relative span.
  */
 export function improveAcornErrorMessage(
     text: string,
@@ -140,9 +142,10 @@ export function improveAcornErrorMessage(
             column: number;
         };
     },
+    offset = 0,
 ): {
-    contents: string;
-    at: number;
+    start: number;
+    end: number;
     message: string;
 } {
     let pos = err.pos ?? 0;
@@ -156,12 +159,22 @@ export function improveAcornErrorMessage(
         message: dejargon(originalMessage.replace(/\s*\(.*?\)\s*$/, "")),
     };
 
+    // Convert the working `{contents, at}` pair -- a length and a start index
+    // in `text`-relative coordinates -- into a document-relative span. Doing
+    // this in one place, at every return, means there's never a moment where
+    // only part of a diagnostic's position has been rebased by `offset`.
+    const toResult = (): { start: number; end: number; message: string } => ({
+        start: improvedError.at + offset,
+        end: improvedError.at + improvedError.contents.length + offset,
+        message: improvedError.message,
+    });
+
     if (
         originalMessage.startsWith("Unterminated string constant") ||
         originalMessage.startsWith("Unterminated template")
     ) {
         improvedError.contents = extractUnterminatedString(text, pos);
-        return improvedError;
+        return toResult();
     }
 
     // The only other messages we tweak are for generic messages
@@ -170,7 +183,7 @@ export function improveAcornErrorMessage(
         originalMessage.startsWith("Unexpected character") ||
         originalMessage.includes("Unexpected token")
     ))
-        return improvedError;
+        return toResult();
 
     // Unmatched delimiters
     const unmatched = findUnmatchedDelimiter(text);
@@ -179,7 +192,7 @@ export function improveAcornErrorMessage(
         improvedError.contents = unmatched.contents;
         improvedError.at = unmatched.pos;
         improvedError.message = `Opening '${unmatched.open}' is missing a matching '${unmatched.close}'`;
-        return improvedError;
+        return toResult();
     }
 
     const context = text.slice(0, pos);
@@ -206,7 +219,7 @@ export function improveAcornErrorMessage(
             improvedError.message =
                 "Expected property or method name after '.'";
         }
-        return improvedError;
+        return toResult();
     }
 
     // Incomplete expression? (`foo +`)
@@ -216,7 +229,7 @@ export function improveAcornErrorMessage(
         improvedError.contents = m[1];
         improvedError.message =
             "Unexpected token; expression appears incomplete after operator";
-        return improvedError;
+        return toResult();
     }
 
     // Incomplete property definition? (`foo :`)
@@ -226,7 +239,7 @@ export function improveAcornErrorMessage(
             (m.indices?.at(0)?.at(0) ?? 0) + m[1].length + lineNdx;
         improvedError.contents = ":";
         improvedError.message = "Expected value after ':'";
-        return improvedError;
+        return toResult();
     }
 
     // Incomplete control statement? (`if `)
@@ -235,7 +248,7 @@ export function improveAcornErrorMessage(
         // Leave the original position alone but mark that character
         improvedError.contents = text.slice(pos, pos + 1);
         improvedError.message = "Unexpected token; expected '('";
-        return improvedError;
+        return toResult();
     }
 
     // Incomplete catch statement? (`catch `)
@@ -244,8 +257,8 @@ export function improveAcornErrorMessage(
         // Leave the original position alone but mark that character
         improvedError.contents = text.slice(pos, pos + 1);
         improvedError.message = "Unexpected token; expected '{'";
-        return improvedError;
+        return toResult();
     }
 
-    return improvedError;
+    return toResult();
 }
