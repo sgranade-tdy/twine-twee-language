@@ -676,7 +676,9 @@ describe("SugarCube TwineScript", () => {
                 storyState,
             ).error;
 
-            expect(result?.start).to.equal(139);
+            // The span covers the whole `==` operator, not just its last
+            // character.
+            expect(result?.start).to.equal(138);
             expect(result?.end).to.equal(140);
         });
     });

@@ -36,10 +36,14 @@ export interface OpenDelimiter {
     end: number;
 }
 
-/** A line of source text, with the offset at which it begins. */
-export interface SourceLine {
-    text: string;
-    start: number;
+/**
+ * A closing delimiter that doesn't match the delimiter it closes.
+ */
+export interface MismatchedCloser {
+    /** The delimiter the close was matched against. */
+    open: OpenDelimiter;
+    /** The offending closing token. */
+    closer: FailureToken;
 }
 
 const closerFor: Record<string, string> = {
@@ -111,6 +115,12 @@ export class ParseFailure {
     readonly text: string;
     /** The offset Acorn reported the failure at, within `text`. */
     readonly pos: number;
+    /**
+     * Acorn's own message, stripped of the trailing `(line:column)` it
+     * appends. Rules that key off a specific Acorn message read this; nothing
+     * else should need it.
+     */
+    readonly message: string;
 
     private readonly parserState: ParserState | undefined;
     private tokenCache: acorn.Token[] | undefined;
@@ -122,6 +132,7 @@ export class ParseFailure {
     constructor(text: string, err: ErrorWithParserState & { pos?: number }) {
         this.text = text;
         this.pos = err.pos ?? 0;
+        this.message = err.message.replace(/\s*\(.*?\)\s*$/, "");
         this.parserState = err.parserState;
     }
 
@@ -244,34 +255,83 @@ export class ParseFailure {
     }
 
     /**
-     * The source text preceding the failure.
+     * The token immediately before the opening delimiter that the close the
+     * failure follows had matched.
      *
-     * @returns Everything in `text` before the failure position.
+     * This is how a rule asks what construct just ended: for
+     * `try {} catch (e)` it answers `catch`, whatever the group in between
+     * contains. `tokenBefore()` alone can't answer it, since that's only ever
+     * the closing delimiter.
+     *
+     * @returns The token before the matched opener, or `undefined` if the
+     * failure doesn't follow a close, the close matched nothing, or the
+     * opener is the first token in the text.
      */
-    textBefore(): string {
-        return this.text.slice(0, this.pos);
+    tokenBeforeMatchedOpener(): FailureToken | undefined {
+        const closer = this.tokenBefore();
+        if (closer === undefined || !closers.has(closer.label)) {
+            return undefined;
+        }
+
+        const tokens = this.tokens();
+        const openerIndices: number[] = [];
+        for (let i = 0; i < tokens.length; i++) {
+            const token = tokens[i];
+            if (token.start >= closer.start) break;
+
+            const label = token.type.label;
+            if (openers.has(label)) {
+                openerIndices.push(i);
+            } else if (closers.has(label)) {
+                const top = openerIndices[openerIndices.length - 1];
+                if (
+                    top !== undefined &&
+                    closerFor[tokens[top].type.label] === label
+                ) {
+                    openerIndices.pop();
+                }
+            }
+        }
+
+        const openerIndex = openerIndices[openerIndices.length - 1];
+        if (
+            openerIndex === undefined ||
+            closerFor[tokens[openerIndex].type.label] !== closer.label ||
+            openerIndex === 0
+        ) {
+            return undefined;
+        }
+
+        return this.toFailureToken(tokens[openerIndex - 1]);
     }
 
     /**
-     * The last line with content before the failure, truncated at the failure
-     * position -- the window the pattern-matching rules look at.
+     * The offending close when the parse failed at a closing delimiter that
+     * doesn't match the one it would be closing.
      *
-     * @returns The line's text and the offset at which it begins.
+     * The comparison is against the token scan's innermost open delimiter, not
+     * against `unclosedDelimiter()`: by the time a close is read, the parser
+     * has already dropped the delimiter it matched from its context, so a
+     * legitimate close (`let x = (1, {a: }`, whose `}` closes the `{`) would
+     * otherwise be measured against the outer `(` and read as a mismatch.
+     *
+     * @returns The mismatched close and the delimiter it was measured
+     * against, or `undefined` if the parse didn't fail on a close, or the
+     * close matched, or nothing was open to close.
      */
-    lineBefore(): SourceLine {
-        const before = this.textBefore();
-        const lines = [...before.matchAll(/(?<=^|\n).*?(?=\r?\n|$)/dg)];
-        if (lines.length === 0) return { text: "", start: 0 };
-
-        let ndx = lines.length - 1;
-        while (ndx > 0 && /^\s*$/.test(lines[ndx][0])) {
-            ndx--;
+    mismatchedCloser(): MismatchedCloser | undefined {
+        const closer = this.failingToken();
+        if (closer === undefined || !closers.has(closer.label)) {
+            return undefined;
         }
 
-        return {
-            text: lines[ndx][0],
-            start: lines[ndx].indices?.at(0)?.at(0) ?? 0,
-        };
+        const stack = this.openDelimiterStack();
+        const open = stack[stack.length - 1];
+        if (open === undefined || open.close === closer.label) {
+            return undefined;
+        }
+
+        return { open, closer };
     }
 
     /**

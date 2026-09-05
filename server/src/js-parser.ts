@@ -5,6 +5,7 @@ import { DiagnosticSeverity } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
 import { improveAcornErrorMessage } from "./acorn-errors";
+import type { AcornSyntaxError } from "./acorn-errors";
 import { ParserWithState } from "./acorn-errors/parser-state";
 import { createLocationFor } from "./parser";
 import {
@@ -1010,18 +1011,7 @@ export function parseJS(
             return [undefined, undefined];
         }
         diagnostic = {
-            ...improveAcornErrorMessage(
-                text,
-                err as SyntaxError & {
-                    pos?: number;
-                    loc?: {
-                        line: number;
-                        column: number;
-                    };
-                    raisedAt?: number;
-                },
-                offset,
-            ),
+            ...improveAcornErrorMessage(text, err as AcornSyntaxError, offset),
             severity: DiagnosticSeverity.Error,
         };
     }
