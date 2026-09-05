@@ -2,6 +2,7 @@ import { dejargon } from "./dejargon";
 import { ParseFailure } from "./parse-failure";
 import type { ErrorWithParserState } from "./parser-state";
 import {
+    fallbackImprovement,
     rules,
     unclosedDelimiterRule,
     unknownImprovement,
@@ -111,12 +112,9 @@ export function improveAcornErrorMessage(
     if (unterminated !== undefined) return toResult(unterminated);
 
     if (!isGenericMessage(failure.message)) {
-        return toResult({
-            kind: "unknown",
-            start: failure.pos,
-            end: failure.pos,
-            message: dejargon(failure.message),
-        });
+        return toResult(
+            fallbackImprovement(failure, dejargon(failure.message)),
+        );
     }
 
     const candidates: Improvement[] = [];

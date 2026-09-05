@@ -37,6 +37,14 @@ export interface OpenDelimiter {
 }
 
 /**
+ * A range of the text that was parsed.
+ */
+export interface Span {
+    start: number;
+    end: number;
+}
+
+/**
  * A closing delimiter that doesn't match the delimiter it closes.
  */
 export interface MismatchedCloser {
@@ -123,17 +131,22 @@ export class ParseFailure {
     readonly message: string;
 
     private readonly parserState: ParserState | undefined;
+    private readonly raisedAt: number | undefined;
     private tokenCache: acorn.Token[] | undefined;
 
     /**
      * @param text Text that failed to parse.
      * @param err Error Acorn threw, optionally carrying parser state.
      */
-    constructor(text: string, err: ErrorWithParserState & { pos?: number }) {
+    constructor(
+        text: string,
+        err: ErrorWithParserState & { pos?: number; raisedAt?: number },
+    ) {
         this.text = text;
         this.pos = err.pos ?? 0;
         this.message = err.message.replace(/\s*\(.*?\)\s*$/, "");
         this.parserState = err.parserState;
+        this.raisedAt = err.raisedAt;
     }
 
     /**
@@ -332,6 +345,101 @@ export class ParseFailure {
         }
 
         return { open, closer };
+    }
+
+    /**
+     * The span to underline when no rule recognized the failure.
+     *
+     * This is the most common outcome, so it can't be allowed to degenerate
+     * into a zero-width squiggle. The order is:
+     *
+     * 1. The token covering Acorn's reported position. Correct by
+     *    construction rather than by heuristic, and available for most
+     *    failures.
+     * 2. At end of input, the last non-whitespace character. The failing token
+     *    is `eof`, whose span is zero-width past the end of the text, and
+     *    Acorn's position says only "the text ran out". (An unclosed
+     *    delimiter is the better answer here, but that's a rule's verdict, so
+     *    it never reaches this fallback.)
+     * 3. `[pos, raisedAt]`, rejected when empty or when it crosses a line.
+     *    Measured, it's frequently zero-width (`if(a){` gives `6,6`) and
+     *    sometimes enormous (`try{}` gives `0,5`, the whole statement), which
+     *    is why it can't come first.
+     * 4. The single character at the position, for lexical faults like
+     *    `x = 1 @ y` where the offending character is part of no token.
+     * 5. Zero-width, when the position is past every character.
+     *
+     * @returns The span, relative to the text that was parsed.
+     */
+    fallbackSpan(): Span {
+        const token = this.tokenCoveringFailure();
+        if (token !== undefined) {
+            return { start: token.start, end: token.end };
+        }
+
+        if (this.isAtEof()) {
+            return this.lastNonWhitespaceSpan();
+        }
+
+        const raisedAtSpan = this.raisedAtSpan();
+        if (raisedAtSpan !== undefined) return raisedAtSpan;
+
+        if (this.pos < this.text.length && !/\s/.test(this.text[this.pos])) {
+            return { start: this.pos, end: this.pos + 1 };
+        }
+
+        return { start: this.pos, end: this.pos };
+    }
+
+    /**
+     * The token that Acorn's reported position falls inside.
+     *
+     * The parser state's own token is preferred, but only when it does
+     * contain the position: `raise` is called with `this.pos`,
+     * `this.lastTokEnd`, and `node.start` at different sites, so for errors
+     * about a construct rather than a token -- `1 = 2`, reported at the `1`
+     * while the parser sits on the `=` -- the two disagree, and the position
+     * is the one that describes the mistake.
+     */
+    private tokenCoveringFailure(): FailureToken | undefined {
+        const covers = (start: number, end: number) =>
+            start <= this.pos && end > this.pos;
+
+        const failing = this.failingToken();
+        if (failing !== undefined && covers(failing.start, failing.end)) {
+            return failing;
+        }
+
+        const token = this.tokens().find((t) => covers(t.start, t.end));
+        return token === undefined ? undefined : this.toFailureToken(token);
+    }
+
+    /**
+     * The last non-whitespace character in the text, as a span, or a
+     * zero-width span at the failure if the text is entirely whitespace.
+     */
+    private lastNonWhitespaceSpan(): Span {
+        for (let i = this.text.length - 1; i >= 0; i--) {
+            if (!/\s/.test(this.text[i])) return { start: i, end: i + 1 };
+        }
+        return { start: this.pos, end: this.pos };
+    }
+
+    /**
+     * `[pos, raisedAt]`, or `undefined` if it's empty or spans a line break.
+     *
+     * A range that crosses a line is rejected because Acorn kept reading
+     * across the break before it gave up: `x=1;\n\n\n\nreturn` raises with
+     * `pos` 8 and `raisedAt` 14, which is mostly blank lines.
+     */
+    private raisedAtSpan(): Span | undefined {
+        if (this.raisedAt === undefined) return undefined;
+
+        const end = Math.min(this.raisedAt, this.text.length);
+        if (end <= this.pos) return undefined;
+        if (/[\r\n]/.test(this.text.slice(this.pos, end))) return undefined;
+
+        return { start: this.pos, end };
     }
 
     /**

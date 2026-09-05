@@ -30,11 +30,12 @@ const testCases: TestCase[] = [
     {
         description:
             "generic sweep: bare identifiers -- no rule matches, so the " +
-            "fallback names the offending token the way espree does",
+            "fallback names the offending token the way espree does and " +
+            "underlines it",
         input: "a b c",
         expectedMessage: "Unexpected token 'b'",
         expectedStart: 2,
-        expectedEnd: 2,
+        expectedEnd: 3,
     },
     {
         description: "generic sweep: empty object property value",
@@ -64,14 +65,17 @@ const testCases: TestCase[] = [
         input: "catch ",
         expectedMessage: "Unexpected token 'catch'",
         expectedStart: 0,
-        expectedEnd: 0,
+        expectedEnd: 5,
     },
     {
-        description: "generic sweep: try with no catch or finally",
+        description:
+            "generic sweep: try with no catch or finally -- the fallback " +
+            "underlines the 'try' at Acorn's position, not the whole " +
+            "statement that [pos, raisedAt] would have covered",
         input: "try{}",
         expectedMessage: "Missing catch or finally clause",
         expectedStart: 0,
-        expectedEnd: 0,
+        expectedEnd: 3,
     },
     {
         description: "generic sweep: unclosed if body",
@@ -81,11 +85,14 @@ const testCases: TestCase[] = [
         expectedEnd: 6,
     },
     {
-        description: "generic sweep: invalid character",
+        description:
+            "generic sweep: invalid character -- a lexical fault, so no " +
+            "token covers the failure and the offending character itself is " +
+            "the span",
         input: "x = 1 @ y",
         expectedMessage: "Unexpected character '@'",
         expectedStart: 6,
-        expectedEnd: 6,
+        expectedEnd: 7,
     },
     {
         description:
@@ -95,7 +102,7 @@ const testCases: TestCase[] = [
         expectedMessage:
             "Missing space between a number and the following identifier",
         expectedStart: 1,
-        expectedEnd: 1,
+        expectedEnd: 2,
     },
 
     // --- Broken JavaScript harvested from existing story-format test fixtures ---
@@ -221,7 +228,7 @@ const testCases: TestCase[] = [
         input: "1 = 2",
         expectedMessage: "Invalid assignment target",
         expectedStart: 0,
-        expectedEnd: 0,
+        expectedEnd: 1,
     },
     {
         description: "dejargon: doubly-parenthesized arrow function parameter",
@@ -229,7 +236,7 @@ const testCases: TestCase[] = [
         expectedMessage:
             "Parenthesized expression can't be a destructuring target",
         expectedStart: 1,
-        expectedEnd: 1,
+        expectedEnd: 2,
     },
     {
         description:
@@ -238,13 +245,13 @@ const testCases: TestCase[] = [
         expectedMessage:
             "Shorthand property assignment is only valid in a destructuring pattern",
         expectedStart: 4,
-        expectedEnd: 4,
+        expectedEnd: 5,
     },
     {
         description: "dejargon: destructuring pattern with no initializer",
         input: "let {a} = {}, {b}",
         expectedMessage: "Destructuring pattern needs an initial value",
-        expectedStart: 17,
+        expectedStart: 16,
         expectedEnd: 17,
     },
     {
@@ -252,35 +259,35 @@ const testCases: TestCase[] = [
         input: "let [a, ...b,] = []",
         expectedMessage: "A rest element can't be followed by a comma",
         expectedStart: 12,
-        expectedEnd: 12,
+        expectedEnd: 13,
     },
     {
         description: "dejargon: rest element with a default value",
         input: "([...a = []] = [])",
         expectedMessage: "A rest element can't have a default value",
         expectedStart: 5,
-        expectedEnd: 5,
+        expectedEnd: 6,
     },
     {
         description: "dejargon: setter using rest parameters",
         input: "let obj = {set a(...args) {}}",
         expectedMessage: "A setter can't use rest parameters",
         expectedStart: 17,
-        expectedEnd: 17,
+        expectedEnd: 20,
     },
     {
         description: "dejargon: break with no enclosing loop or switch",
         input: "break",
         expectedMessage: "Invalid 'break': no enclosing loop or switch",
         expectedStart: 0,
-        expectedEnd: 0,
+        expectedEnd: 5,
     },
     {
         description: "dejargon: continue with no enclosing loop",
         input: "continue",
         expectedMessage: "Invalid 'continue': no enclosing loop or switch",
         expectedStart: 0,
-        expectedEnd: 0,
+        expectedEnd: 8,
     },
     {
         description: "dejargon: mixing '??' with '||' without parentheses",
@@ -288,14 +295,14 @@ const testCases: TestCase[] = [
         expectedMessage:
             "Mixing '??' with '&&' or '||' needs parentheses around one of them",
         expectedStart: 7,
-        expectedEnd: 7,
+        expectedEnd: 9,
     },
     {
         description: "dejargon: duplicate '__proto__' property",
         input: "({__proto__: 1, __proto__: 2})",
         expectedMessage: "Duplicate '__proto__' property",
         expectedStart: 16,
-        expectedEnd: 16,
+        expectedEnd: 25,
     },
     {
         description:
@@ -304,42 +311,42 @@ const testCases: TestCase[] = [
         expectedMessage:
             "A destructuring pattern can't contain a getter or setter",
         expectedStart: 6,
-        expectedEnd: 6,
+        expectedEnd: 7,
     },
     {
         description: "dejargon: optional chaining on an assignment's left side",
         input: "a?.b = 1",
         expectedMessage: "'?.' can't appear on the left side of an assignment",
         expectedStart: 0,
-        expectedEnd: 0,
+        expectedEnd: 1,
     },
     {
         description: "dejargon: optional chaining before 'new'",
         input: "new a?.b()",
         expectedMessage: "'?.' can't appear before 'new'",
         expectedStart: 5,
-        expectedEnd: 5,
+        expectedEnd: 7,
     },
     {
         description: "dejargon: optional chaining before a tagged template",
         input: "a?.b`template`",
         expectedMessage: "'?.' can't appear before a tagged template",
         expectedStart: 4,
-        expectedEnd: 4,
+        expectedEnd: 5,
     },
     {
         description: "dejargon: escaped character inside a keyword",
         input: "function f() { 'use strict'; \\u0069f (1) {} }",
         expectedMessage: "Invalid escape sequence in the keyword 'if'",
         expectedStart: 29,
-        expectedEnd: 29,
+        expectedEnd: 36,
     },
     {
         description: "dejargon: duplicate parameter name",
         input: "function f(a, a) { 'use strict'; }",
         expectedMessage: "Duplicate parameter name",
         expectedStart: 14,
-        expectedEnd: 14,
+        expectedEnd: 15,
     },
     {
         description: "dejargon: 'use strict' with a non-simple parameter list",
@@ -347,14 +354,14 @@ const testCases: TestCase[] = [
         expectedMessage:
             "'use strict' can't be used with default, rest, or destructured parameters",
         expectedStart: 0,
-        expectedEnd: 0,
+        expectedEnd: 8,
     },
     {
         description: "dejargon: 'new super()' outside a subclass constructor",
         input: "class C extends D { constructor() { new super(); } }",
         expectedMessage: "'new' can't be used with 'super'",
         expectedStart: 40,
-        expectedEnd: 40,
+        expectedEnd: 45,
     },
 
     // --- Arbitration: which rule wins, and where it points ---
@@ -420,7 +427,38 @@ const testCases: TestCase[] = [
         input: "let a = 1 +\nlet b = 2;",
         expectedMessage: "Unexpected token 'b'",
         expectedStart: 16,
-        expectedEnd: 16,
+        expectedEnd: 17,
+    },
+
+    // --- Fallback span (phase 07): what gets underlined when no rule ---
+    // --- matched ---
+    {
+        description:
+            "fallback: at end of input with nothing left open, the last " +
+            "non-whitespace character is underlined rather than the " +
+            "zero-width point past the end of the text",
+        input: "if (a) ;\nelse",
+        expectedMessage: "Unexpected end of input",
+        expectedStart: 12,
+        expectedEnd: 13,
+    },
+    {
+        description:
+            "fallback: the whole failing token is underlined, not just its " +
+            "first character",
+        input: "let x = 1; x oops",
+        expectedMessage: "Unexpected token 'oops'",
+        expectedStart: 13,
+        expectedEnd: 17,
+    },
+    {
+        description:
+            "fallback: a message the rules never see still gets the failing " +
+            "token's span",
+        input: "let x = 1;\nreturn",
+        expectedMessage: "'return' outside of function",
+        expectedStart: 11,
+        expectedEnd: 17,
     },
 ];
 

@@ -305,6 +305,28 @@ export const rules: readonly Rule[] = [
 ];
 
 /**
+ * What to report when nothing recognized the failure: the message as-is over
+ * the context's fallback span.
+ *
+ * Both ends of the generic/non-generic split in `index.ts` land here, so the
+ * "no rule matched" shape is built in one place.
+ *
+ * @param failure The parse failure context.
+ * @param message The message to report.
+ * @returns The improvement.
+ */
+export function fallbackImprovement(
+    failure: ParseFailure,
+    message: string,
+): Improvement {
+    return {
+        kind: "unknown",
+        ...failure.fallbackSpan(),
+        message,
+    };
+}
+
+/**
  * What to report when no rule matched.
  *
  * Acorn's generic messages name no token at all -- a bare `Unexpected token`
@@ -330,10 +352,5 @@ export function unknownImprovement(
         }
     }
 
-    return {
-        kind: "unknown",
-        start: failure.pos,
-        end: failure.pos,
-        message,
-    };
+    return fallbackImprovement(failure, message);
 }

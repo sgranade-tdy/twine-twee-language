@@ -32,10 +32,11 @@ function failureFor(input: string): ParseFailure {
 function failureWithoutParserState(
     input: string,
     pos: number,
+    raisedAt?: number,
 ): ParseFailure {
     const err: ErrorWithParserState = Object.assign(
         new SyntaxError("synthetic"),
-        { pos },
+        { pos, raisedAt },
     );
     return new ParseFailure(input, err);
 }
@@ -352,7 +353,8 @@ describe("ParseFailure", () => {
 
     describe("tokenBeforeMatchedOpener", () => {
         it("reports the token before the opener of a group the failure follows", () => {
-            const result = failureFor("try {} catch (e)").tokenBeforeMatchedOpener();
+            const result =
+                failureFor("try {} catch (e)").tokenBeforeMatchedOpener();
 
             expect(result).to.eql({
                 label: "catch",
@@ -428,6 +430,57 @@ describe("ParseFailure", () => {
                 close: ")",
                 start: 8,
                 end: 9,
+            });
+        });
+    });
+
+    describe("fallbackSpan", () => {
+        it("underlines the token that covers the failure", () => {
+            expect(failureFor("a b c").fallbackSpan()).to.eql({
+                start: 2,
+                end: 3,
+            });
+        });
+
+        it("prefers the position's token over the parser's current one", () => {
+            // Acorn raises `1 = 2` at the `1` while sitting on the `=`; the
+            // position is what describes the mistake.
+            expect(failureFor("1 = 2").fallbackSpan()).to.eql({
+                start: 0,
+                end: 1,
+            });
+        });
+
+        it("underlines the last non-whitespace character at end of input", () => {
+            expect(failureFor("if (a) ;\nelse\n ").fallbackSpan()).to.eql({
+                start: 12,
+                end: 13,
+            });
+        });
+
+        it("underlines [pos, raisedAt] when no token covers the failure", () => {
+            expect(
+                failureWithoutParserState("a  @b", 2, 4).fallbackSpan(),
+            ).to.eql({ start: 2, end: 4 });
+        });
+
+        it("rejects a [pos, raisedAt] range that crosses a line", () => {
+            expect(
+                failureWithoutParserState("a \n @b", 2, 5).fallbackSpan(),
+            ).to.eql({ start: 2, end: 2 });
+        });
+
+        it("underlines the offending character of a lexical fault", () => {
+            expect(failureFor("x = 1 @ y").fallbackSpan()).to.eql({
+                start: 6,
+                end: 7,
+            });
+        });
+
+        it("is zero-width when the text is entirely whitespace", () => {
+            expect(failureWithoutParserState("   ", 3).fallbackSpan()).to.eql({
+                start: 3,
+                end: 3,
             });
         });
     });
