@@ -45,6 +45,42 @@ ADR-0002's rejection of them as a diagnostic signal is legible.
 Replaces the older `{contents, at}` pair, where `contents` was only ever consumed
 for its `.length`.
 
+## JavaScript symbol extraction
+
+The other half of `server/src/js-parser.ts`: finding the names in a passage's
+JavaScript that belong to the _story_, so they can be indexed, cross-referenced
+and renamed.
+
+**Story variable**: a name in a passage's JavaScript that holds story state the
+author controls. Recognized by being unbound within the snippet the parser was
+handed — see ADR-0003 — not by any list of known names. _Avoid_: "global", which
+names the heuristic rather than the thing.
+
+**Story property**: a member reached from a story variable, carried with the full
+dotted path that reaches it (`prefix` + name). A property whose path can't be
+spelled isn't a story property at all.
+
+**Occurrence**: one appearance of a story variable or property at one location.
+Every occurrence is indexed; the same name occurring five times is five
+occurrences, because rename must rewrite all of them.
+
+**Assignment**: an occurrence that _writes_ the name (`$x = 1`, `$x.y = 1`).
+Twine variables are never declared, so this is the only creation signal the
+parser has — which is why the story formats can force it on for constructs they
+know are writes (`<<set>>`, a setter link, a Chapbook vars section). _Avoid_:
+"definition", which implies a declaration site that Twine JavaScript doesn't
+have.
+
+**Declaration**: a JavaScript binding form — `var`/`let`/`const`, `function`,
+`class`. Unambiguous where an assignment isn't, so a root-level declaration is an
+assignment regardless of what the caller asked for.
+
+**Resolvable chain**: a member expression whose every segment has a statically
+known name, rooted in an identifier. `$a.b['c']` is resolvable; `$a().b` and
+everything after a computed segment in `$a[i].b` are not. Unresolvable segments
+are dropped rather than guessed at, because a property indexed under the wrong
+prefix renames the wrong thing.
+
 ## Diagnostics
 
 **Diagnostic code**: a member of `DiagnosticCodes`, with default message and
