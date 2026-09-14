@@ -26,12 +26,14 @@ async function main() {
 
     if (watch) {
         await ctx.watch();
+        await fs.mkdir("dist/client/src", { recursive: true });
         await fs.copyFile(
             path.resolve("client/src/media-rewriter.js"),
             path.resolve("dist/client/src/media-rewriter.js"),
         );
     } else {
         await ctx.rebuild();
+        await fs.mkdir("dist/client/src", { recursive: true });
         await fs.copyFile(
             path.resolve("client/src/media-rewriter.js"),
             path.resolve("dist/client/src/media-rewriter.js"),
@@ -70,7 +72,6 @@ const esbuildProblemMatcherPlugin = {
  *
  *   - vscode-css-languageservice
  *   - vscode-html-languageservice
- *   - vscode-json-languageservice
  *   - jsonc-parser
  *
  * The full status of the files is captured at https://github.com/microsoft/vscode/issues/192144
@@ -84,7 +85,7 @@ const umdToEsmLoaderPlugin = {
     setup(build) {
         build.onLoad(
             {
-                filter: /(vscode-(json|css|html)-languageservice|jsonc-parser)[\/\\]lib[\/\\]umd/,
+                filter: /(vscode-(css|html)-languageservice|jsonc-parser)[\/\\]lib[\/\\]umd/,
             },
             async (args) => {
                 // Load the "ESM" version instead of the UMD version

@@ -92,7 +92,7 @@
         "grammars": [
             {
                 "language": "twee3",
-                "scopeName": "source.twee3",
+                "scopeName": "source.tt3",
                 "path": "./syntaxes/twee3.tmLanguage.json",
                 "embeddedLanguages": {
                     "source.json.twee3": "json",
@@ -103,7 +103,7 @@
             },
             {
                 "language": "twee3-chapbook-2",
-                "scopeName": "source.twee3.chapbook-2",
+                "scopeName": "source.tt3.chapbook-2",
                 "path": "./syntaxes/twee3.chapbook-2.tmLanguage.json",
                 "embeddedLanguages": {
                     "source.json.twee3": "json",
@@ -115,7 +115,7 @@
             },
             {
                 "language": "twee3-sugarcube-2",
-                "scopeName": "source.twee3.sugarcube-2",
+                "scopeName": "source.tt3.sugarcube-2",
                 "path": "./syntaxes/twee3.sugarcube-2.tmLanguage.json",
                 "embeddedLanguages": {
                     "source.json.twee3": "json",
@@ -274,6 +274,7 @@
         "shared"
     ],
     "scripts": {
+        "vsce-package": "vsce package",
         "vscode:prepublish": "npm run package",
         "build": "npm-run-all2 check-types prebuild esbuild",
         "prebuild": "npm-run-all2 capture-version build-schema",
@@ -285,8 +286,8 @@
         "watch:esbuild": "npm run prebuild && node esbuild.jsx --watch",
         "watch:tsc": "tsc -b --noEmit --watch",
         "package": "npm-run-all2 check-types prebuild \"esbuild -- --production\"",
-        "test": "cross-env nyc mocha --import=tsx",
-        "coverage": "nyc report --reporter=text-lcov > coverage.lcov",
+        "test": "mocha --import=tsx",
+        "coverage": "nyc npm run test && nyc report --reporter=text-lcov > coverage.lcov",
         "lint": "eslint ./client/src ./server/src ./shared/src"
     },
     "devDependencies": {
@@ -295,12 +296,12 @@
         "@types/mocha": "^10.0.6",
         "@types/node": "^20.19.43",
         "@types/sinon": "^21.0.1",
+        "@vscode/vsce": "^3.9.2",
         "chai": "^6.2.2",
-        "cross-env": "^10.1.0",
         "esbuild": "^0.28.0",
         "eslint": "^10.2.0",
         "globals": "^17.5.0",
-        "mocha": "^11.0.1",
+        "mocha": "^12.0.0",
         "npm-run-all2": "^9.0.2",
         "nyc": "^18.0.0",
         "prettier": "^3.3.3",
@@ -310,5 +311,10 @@
         "typescript": "^6.0.2",
         "typescript-eslint": "^8.0.0-alpha.10",
         "zod": "^4.4.3"
+    },
+    "allowScripts": {
+        "esbuild@0.28.2": true,
+        "@vscode/vsce-sign@2.1.0": true,
+        "keytar@7.9.0": true
     }
 }

@@ -306,14 +306,19 @@ export function tokenizeTwineScriptExpression(
 
     // Adjust diagnostic location
     if (jsTokens.error) {
-        const { sugaredPosition, sugaredText } = getSugaredPositionAndNewText(
-            jsTokens.error.at,
+        // Both endpoints are mapped on their own, since the desugared-to-sugared
+        // delta at the end of a span can differ from the delta at its start.
+        const { sugaredPosition: sugaredStart } = getSugaredPositionAndNewText(
+            jsTokens.error.start,
             positionMapping,
         );
-        jsTokens.error.at = offset + sugaredPosition;
-        jsTokens.error.contents = sugaredText ?? jsTokens.error.contents;
+        const { sugaredPosition: sugaredEnd } = getSugaredPositionAndNewText(
+            jsTokens.error.end,
+            positionMapping,
+        );
+        jsTokens.error.start = offset + sugaredStart;
+        jsTokens.error.end = offset + sugaredEnd;
     }
-
     // Adjust semantic token locations and (if needed) text
     for (const t of Object.values(desugaredStoryFormatState.passageTokens)) {
         const { sugaredPosition, sugaredText } = getSugaredPositionAndNewText(

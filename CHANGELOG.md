@@ -10,16 +10,17 @@ Three big changes:
 - Diagnostics have been extensively re-worked.
     - The extension now reports JavaScript errors.
     - It flags variables that (it thinks) have never been defined.
-    - You can disable any diagnostic on a per-passage basis.
+    - Every diagnostic has a Quick Action to let you disable it for a single passage or globally (through the config file).
 - Passage tag handling has been greatly improved.
     - Tag auto-complete? Yes, please!
     - Find every reference to a tag or rename a tag the same way you can a passage or variable.
 
 ### Added
 
+- `tt3.config.json` to set story build configuration.
 - JavaScript diagnostics (warnings and errors) are now reported.
-- Diagnostics can now be disabled in a passage by adding `tt3-disable` followed by comma-separated list of diagnostics to the passage's tags: `[tt3-disable <error 1>,<error 2>]`.
-- Added a quick fix action for disabling diagnostics for a passage.
+- Diagnostics can now be disabled in a passage by adding `tt3-disable` followed by comma-separated list of diagnostics to the passage's tags: `[tt3-disable <diagnostic-code-1>,<diagnostic-code-2>]`.
+- Added Quick Fix actions for disabling diagnostics for a passage or globally.
 - You can now search for and rename passage tags the same way you can passages and variables.
 - Passage tags now auto-complete.
 - Variables and properties that haven't been defined now create a warning across both story format code (Chapbook/SugarCube) and JavaScript sections.
@@ -40,9 +41,11 @@ Three big changes:
 ### Fixed
 
 - When running a game in VS Code, error modals are now shown in VS Code instead of being silently swallowed.
+- Deconflicted language scope names with T3LT. (issue #10)
 - SugarCube: Improved syntax highlighting of twee links.
 - SugarCube: Fixed parsing of special variables in `<<script>>` macros.
 - SugarCube: No longer incorrectly indexes apparent variables in non-data HTML attributes.
+- SugarCube: Now correctly places the end of diagnostic squiggles on TwineScript expressions.
 
 ## [1.1.5] - 2026 04 12
 
