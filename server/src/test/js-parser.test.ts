@@ -1438,11 +1438,11 @@ describe("JS Parser", () => {
             },
             {
                 description:
-                    "try{a()}catch(e){e.message} // defect 3: catch param leaks `e`",
+                    "try{a()}catch(e){e.message} // defect 3 (partial, ticket 02): the ancestors off-by-one that misclassified the catch param as a reference is fixed, so the param itself no longer leaks; `e.message` still resolves globally because CatchClause still doesn't open a scope (ticket 03)",
                 input: "try{a()}catch(e){e.message}",
                 isProgram: true,
-                variables: ["e", "e"], // defect 3
-                properties: ["e.message"], // defect 3
+                variables: ["e"], // defect 3, remainder
+                properties: ["e.message"], // defect 3, remainder
             },
             {
                 description: "class A {} // defect 4: class name unbound",
@@ -1578,10 +1578,11 @@ describe("JS Parser", () => {
 
             // --- Calls ---
             {
-                description: "foo(bar) // defect 1: argument lost entirely",
+                description:
+                    "foo(bar) // defect 1, fixed by ticket 02: call arguments are no longer blanket-excluded, only the callee",
                 input: "foo(bar)",
                 isProgram: true,
-                variables: [], // defect 1
+                variables: ["bar"],
                 properties: [],
             },
             {
@@ -1593,10 +1594,11 @@ describe("JS Parser", () => {
                 properties: ["bar.baz"],
             },
             {
-                description: "a = foo(b) // defect 1: argument lost entirely",
+                description:
+                    "a = foo(b) // defect 1, fixed by ticket 02: same as foo(bar)",
                 input: "a = foo(b)",
                 isProgram: true,
-                variables: ["a"], // defect 1
+                variables: ["a", "b"],
                 properties: [],
             },
             {
@@ -1607,31 +1609,35 @@ describe("JS Parser", () => {
                 properties: [],
             },
             {
-                description: "obj.method(x)",
+                description:
+                    "obj.method(x) // defect 1, fixed by ticket 02: same as foo(bar)",
                 input: "obj.method(x)",
                 isProgram: true,
-                variables: ["obj"],
+                variables: ["obj", "x"],
                 properties: [],
             },
             {
-                description: "obj.a.method(x)",
+                description:
+                    "obj.a.method(x) // defect 1, fixed by ticket 02: same as foo(bar)",
                 input: "obj.a.method(x)",
                 isProgram: true,
-                variables: ["obj"],
+                variables: ["obj", "x"],
                 properties: ["obj.a"],
             },
             {
-                description: "setTimeout(fn, 1)",
+                description:
+                    "setTimeout(fn, 1) // defect 1, fixed by ticket 02: same as foo(bar)",
                 input: "setTimeout(fn, 1)",
                 isProgram: true,
-                variables: [],
+                variables: ["fn"],
                 properties: [],
             },
             {
-                description: "parseInt(a)",
+                description:
+                    "parseInt(a) // defect 1, fixed by ticket 02: same as foo(bar)",
                 input: "parseInt(a)",
                 isProgram: true,
-                variables: [],
+                variables: ["a"],
                 properties: [],
             },
             {
@@ -1644,17 +1650,19 @@ describe("JS Parser", () => {
 
             // --- Built-ins ---
             {
-                description: "Math.max(a,b)",
+                description:
+                    "Math.max(a,b) // defect 1, fixed by ticket 02: same as foo(bar)",
                 input: "Math.max(a,b)",
                 isProgram: true,
-                variables: [],
+                variables: ["a", "b"],
                 properties: [],
             },
             {
-                description: "console.log(a)",
+                description:
+                    "console.log(a) // defect 1, fixed by ticket 02: same as foo(bar)",
                 input: "console.log(a)",
                 isProgram: true,
-                variables: [],
+                variables: ["a"],
                 properties: [],
             },
             {
@@ -1666,10 +1674,10 @@ describe("JS Parser", () => {
             },
             {
                 description:
-                    "RegExp.test(a) // defect 8: RegExp missing from builtInObjects",
+                    "RegExp.test(a) // defect 8: RegExp missing from builtInObjects; `a` now shows per defect 1's fix (ticket 02)",
                 input: "RegExp.test(a)",
                 isProgram: true,
-                variables: ["RegExp"], // defect 8
+                variables: ["RegExp", "a"], // defect 8
                 properties: [],
             },
             {
@@ -1720,20 +1728,20 @@ describe("JS Parser", () => {
             },
             {
                 description:
-                    "obj. // defect 5: the loose-parse placeholder property reaches the index",
+                    "obj. // defect 5, fixed by ticket 02: the loose-parse placeholder property is filtered centrally",
                 input: "obj.",
                 isProgram: false,
                 variables: ["obj"],
-                properties: ["obj.✖"], // defect 5
+                properties: [],
                 error: "Missing property or method name after '.'",
             },
             {
                 description:
-                    "a.b. // defect 5: the loose-parse placeholder property reaches the index",
+                    "a.b. // defect 5, fixed by ticket 02: the loose-parse placeholder property is filtered centrally",
                 input: "a.b.",
                 isProgram: false,
                 variables: ["a"],
-                properties: ["a.b", "a.b.✖"], // defect 5
+                properties: ["a.b"],
                 error: "Missing property or method name after '.'",
             },
             {

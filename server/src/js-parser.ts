@@ -28,18 +28,6 @@ const typeofToSemantic: Record<string, TokenType> = {
     boolean: ETokenType.keyword,
 };
 
-/**
- * Unprocessed token from the Javascript AST.
- */
-interface astUnprocessedToken {
-    text: string; // Actual token text
-    at: number; // Token location
-    type: TokenType; // Type of the token
-    scope?: string; // Token scope for properties (e.g. for `prop2` in `var.prop1.prop2`, it's `var.prop1`)
-    defined?: boolean; // Is the token being defined?
-    global?: boolean; // Is the token at the global level of the AST? (for variables/properties)
-    modifiers: TokenModifier[]; // Modifiers for the token
-}
 
 /**
  * Label for a parsed javascript variable.
@@ -107,8 +95,6 @@ export interface TokenizedJS {
     error?: JSDiagnostic;
 }
 
-let currentExpression: string = "";
-let unprocessedTokens: Record<number, astUnprocessedToken> = {};
 
 const builtInObjects = new Set([
     // Taken from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
@@ -336,55 +322,77 @@ function collectPatternIdentifiers(
 }
 
 /**
- * Is an identifier a reference (i.e. not a declaration or a parameter)?
+ * How an identifier functions in the AST: whether it's a declaration
+ * (a name being bound, e.g. `var`/`let`/`const`, a function name or
+ * parameter, or a `catch` parameter), a reference (an occurrence that reads
+ * -- or, if the caller treats assignment as definition, writes -- a bound or
+ * unbound name), or neither (a property key, a label, or an import binding,
+ * none of which are ever variables).
  *
- * @param node Node to test.
- * @param ancestors Node's ancestors.
- * @returns True if the identifier is a reference.
+ * This is the single source of truth for that question. Both the scope-
+ * annotating walk (which needs to know whether to bind a name) and the
+ * tokenizing/extraction walk (which needs to know whether an identifier is a
+ * candidate occurrence at all) consult it instead of re-deriving the answer
+ * from ancestor types themselves.
  */
-function isReferenceIdentifier(
+type IdentifierRole = "declaration" | "reference" | "neither";
+
+/**
+ * Classify an identifier given its ancestors.
+ *
+ * @param node Node to classify.
+ * @param ancestors Node's ancestors, ending with `node` itself (the
+ * acorn-walk `fullAncestor` convention).
+ * @returns The identifier's role.
+ */
+function classifyIdentifier(
     node: acorn.AnyNode,
     ancestors: acorn.Node[],
-): boolean {
+): IdentifierRole {
     const parent = ancestors[ancestors.length - 2] as acorn.AnyNode | undefined;
 
     // Consider parent-less identifiers as a reference for times when we just parse the tiniest snippet
-    if (!parent) return true;
+    if (!parent) return "reference";
 
     switch (parent.type) {
         case "VariableDeclarator":
-            return parent.id !== node;
+            return parent.id === node ? "declaration" : "reference";
 
         case "FunctionDeclaration":
         case "FunctionExpression":
         case "ArrowFunctionExpression":
-            if (parent.id === node) return false; // function name is a definition
-            return !parent.params.includes(node as acorn.Pattern); // parameter is (maybe) a definition
+            if (parent.id === node) return "declaration"; // function name
+            if (parent.params.includes(node as acorn.Pattern))
+                return "declaration"; // parameter
+            return "reference";
 
         case "Property":
-            if (parent.key === node && !parent.computed) return false; // static key isn't a reference
-            return true;
+            // Static key isn't a reference or a declaration -- it's a property name
+            return parent.key === node && !parent.computed
+                ? "neither"
+                : "reference";
 
         case "MemberExpression":
-            if (parent.property === node && !parent.computed) return false; // Non-computed property key
-            return true;
+            // Non-computed property key -- same reasoning as above
+            return parent.property === node && !parent.computed
+                ? "neither"
+                : "reference";
 
         case "CatchClause":
-            if (parent.param === node) return false;
-            return true;
+            return parent.param === node ? "declaration" : "reference";
 
         case "LabeledStatement":
         case "BreakStatement":
         case "ContinueStatement":
-            return false;
+            return "neither"; // a label, not a variable
 
         case "ImportSpecifier":
         case "ImportDefaultSpecifier":
         case "ImportNamespaceSpecifier":
-            return false;
+            return "neither"; // an import binding, not a variable
 
         default: // Treat all other cases as references
-            return true;
+            return "reference";
     }
 }
 
@@ -393,7 +401,7 @@ function isReferenceIdentifier(
  *
  * @param ast AST to annotate.
  */
-export function annotateVariableScopes(
+function annotateVariableScopes(
     ast: acorn.Node,
     assignmentIsDefinition: boolean,
 ) {
@@ -408,7 +416,7 @@ export function annotateVariableScopes(
                         ? createScope("block", scope)
                         : scope;
                 for (const child of node.body)
-                    visit(child, newScope, [...ancestors, node]);
+                    visit(child, newScope, [...ancestors, child]);
                 return;
             }
 
@@ -428,7 +436,7 @@ export function annotateVariableScopes(
                         bindIdentifier(fnScope, id.name, "param");
                     });
                 }
-                visit(node.body, fnScope, [...ancestors, node]);
+                visit(node.body, fnScope, [...ancestors, node.body]);
                 return;
             }
 
@@ -440,7 +448,7 @@ export function annotateVariableScopes(
                         bindIdentifier(fnScope, id.name, "param");
                     });
                 }
-                visit(node.body, fnScope, [...ancestors, node]);
+                visit(node.body, fnScope, [...ancestors, node.body]);
                 return;
             }
 
@@ -460,14 +468,14 @@ export function annotateVariableScopes(
                         },
                     );
                     if (decl.init)
-                        visit(decl.init, scope, [...ancestors, node]);
+                        visit(decl.init, scope, [...ancestors, decl.init]);
                 }
                 return;
             }
 
             case "Identifier": {
                 const idNode = node as ScopedIdentifier;
-                if (!isReferenceIdentifier(node, ancestors)) break;
+                if (classifyIdentifier(node, ancestors) !== "reference") break;
 
                 const resolved = findBindingScope(scope, node.name);
                 // The identifier is a reference...
@@ -476,7 +484,7 @@ export function annotateVariableScopes(
 
                 // ...unless it's the LHS of an assignment and we're forcing assignment to be definition
                 if (assignmentIsDefinition) {
-                    const parent = ancestors[ancestors.length - 1] as
+                    const parent = ancestors[ancestors.length - 2] as
                         acorn.AnyNode | undefined;
                     if (
                         parent &&
@@ -497,15 +505,15 @@ export function annotateVariableScopes(
             if (Array.isArray(child)) {
                 for (const c of child) {
                     if (c && typeof c === "object" && "type" in c)
-                        visit(c as acorn.AnyNode, scope, [...ancestors, node]);
+                        visit(c as acorn.AnyNode, scope, [...ancestors, c]);
                 }
             } else if ("type" in child) {
-                visit(child as acorn.AnyNode, scope, [...ancestors, node]);
+                visit(child as acorn.AnyNode, scope, [...ancestors, child]);
             }
         }
     }
 
-    visit(ast as acorn.AnyNode, globalScope, []);
+    visit(ast as acorn.AnyNode, globalScope, [ast as acorn.AnyNode]);
 }
 
 /**
@@ -551,7 +559,9 @@ function getStaticPropertyName(
     computed: boolean,
 ): string | undefined {
     if (!computed && property.type === "Identifier") {
-        return property.name;
+        // Loose parsing can synthesize a `✖` placeholder identifier for a
+        // missing property name (e.g. `obj.`); never treat it as a real name.
+        return property.name !== "✖" ? property.name : undefined;
     }
 
     if (
@@ -678,284 +688,482 @@ function captureObjectExpressionProperties(
 }
 
 /**
- * Callback at each node in the AST, capturing tokens of interest.
+ * Is an identifier's immediate ancestor a call/new callee or an excluded
+ * declaration (a function/arrow expression's own name or parameter)?
  *
- * @param rawNode Current node.
- * @param state Parsing state.
- * @param ancestors List of ancestor nodes (including the current one).
+ * Shared by both passes so neither re-derives the same exclusion rules
+ * differently. A call or `new` expression's callee (`foo` in `foo(bar)`,
+ * `Foo` in `new Foo(bar)`) isn't a story-variable occurrence yet -- it's a
+ * function/constructor reference, which is issue 07's business. Neither are
+ * `new Foo(bar)`'s arguments (also issue 07). Nor are a function or arrow
+ * expression's own name and parameters (issue 06 is what starts treating
+ * declarations as story-variable writes). Nor -- pre-existing defect 10,
+ * out of scope here -- is a shorthand object-literal property's value (e.g.
+ * `a` in `{a}`): its position collides with its own key, so it's always
+ * reported as the property, never as the variable read it also is. Everything
+ * else -- references, including plain call arguments, plus
+ * `var`/`let`/`const` and `catch` declarations -- is a real occurrence today.
+ *
+ * @param role The identifier's classified role.
+ * @param ancestor The identifier's immediate parent node, if any.
+ * @param node The identifier (or, for a member-expression callee, the outermost `MemberExpression`) itself.
+ * @returns True if the identifier should be excluded from both highlighting and extraction.
  */
-function fullAncestorTokenizingCallback(
-    rawNode: acorn.Node,
-    _: unknown,
-    ancestors: acorn.Node[],
-): void {
+function isExcludedIdentifier(
+    role: IdentifierRole,
+    ancestor: acorn.AnyNode | undefined,
+    node: acorn.AnyNode,
+): boolean {
+    if (ancestor?.type === "NewExpression") return true;
+    if (ancestor?.type === "CallExpression" && ancestor.callee === node)
+        return true;
+    if (ancestor?.type === "Property" && ancestor.shorthand) return true;
+    return (
+        role === "declaration" &&
+        (ancestor?.type === "FunctionDeclaration" ||
+            ancestor?.type === "FunctionExpression" ||
+            ancestor?.type === "ArrowFunctionExpression")
+    );
+}
+
+/**
+ * A semantic token before it's been reported to the story format parsing state.
+ */
+interface PreSemanticToken {
+    text: string; // Actual token text
+    at: number; // Token location
+    type: TokenType; // Type of the token
+    modifiers: TokenModifier[]; // Modifiers for the token
+}
+
+/**
+ * Compute semantic tokens for a parsed JavaScript program or expression.
+ *
+ * This pass only cares about what a token looks like (its text, position,
+ * and type) and never consults scope, so it doesn't need `annotateVariableScopes`
+ * to have run first.
+ *
+ * @param text Original unparsed text.
+ * @param ast Parsed text.
+ * @returns Object whose keys are the token's location in the unparsed text and whose values are semantic tokens.
+ */
+function computeSemanticTokens(
+    text: string,
+    ast: acorn.Node,
+): Record<number, PreSemanticToken> {
+    const tokens: Record<number, PreSemanticToken> = {};
+
     // We end up setting semantic tokens for some nodes multiple times (for
     // example, an Identifier and then again for a property that's an identifier).
     // We don't worry about that, though, because the walker visits the bottom-most
     // node first, then moves up to the containing expression or property, and the
     // last-set semantic token is the one that's reported.
+    const addToken = (start: number, tokenText: string, type: TokenType) => {
+        tokens[start] = { text: tokenText, at: start, type, modifiers: [] };
+    };
 
-    // Helper function to add a variable to unprocessed tokens if it's not a built-in JS object
+    // Helper function to add a variable token if it's not a built-in JS object
     const captureVariable = (id: ScopedIdentifier) => {
-        if (!id.name || builtInObjects.has(id.name)) return;
-        unprocessedTokens[id.start] = {
+        if (!id.name || id.name === "✖" || builtInObjects.has(id.name))
+            return;
+        addToken(id.start, id.name, ETokenType.variable);
+    };
+
+    // Helper function to add a property token if it's not dynamic
+    const captureProperty = (name: string, start: number) => {
+        if (!name || name === "<dynamic>" || name === "✖") return;
+        addToken(start, name, ETokenType.property);
+    };
+
+    acornWalk.fullAncestor(ast, (rawNode, _, ancestors) => {
+        const node = rawNode as acorn.AnyNode;
+        switch (node.type) {
+            case "Identifier": {
+                const role = classifyIdentifier(node, ancestors);
+                if (role === "neither") break;
+                const ancestor = ancestors[ancestors.length - 2] as
+                    | acorn.AnyNode
+                    | undefined;
+                if (!isExcludedIdentifier(role, ancestor, node)) {
+                    captureVariable(node as ScopedIdentifier);
+                }
+                break;
+            }
+
+            case "Literal": {
+                if (node.raw !== undefined) {
+                    const semanticType = typeofToSemantic[typeof node.value];
+                    if (semanticType !== undefined) {
+                        addToken(node.start, node.raw, semanticType);
+                    }
+                }
+                break;
+            }
+
+            case "AssignmentExpression":
+            case "BinaryExpression":
+            case "LogicalExpression": {
+                const at = text.indexOf(node.operator, node.left.end);
+                addToken(at, node.operator, ETokenType.operator);
+                break;
+            }
+
+            case "CallExpression": {
+                if (node.callee.type === "Identifier") {
+                    addToken(
+                        node.callee.start,
+                        node.callee.name,
+                        ETokenType.function,
+                    );
+                } else if (node.callee.type === "MemberExpression") {
+                    const chain = captureMemberChain(node.callee);
+                    if (chain && chain.properties) {
+                        const lastProp =
+                            chain.properties[chain.properties.length - 1];
+                        addToken(
+                            lastProp.start,
+                            lastProp.name,
+                            ETokenType.function,
+                        );
+                    }
+                }
+                break;
+            }
+
+            case "UnaryExpression":
+            case "UpdateExpression": {
+                const at = node.prefix
+                    ? node.start
+                    : node.end - node.operator.length;
+                addToken(at, node.operator, ETokenType.operator);
+                break;
+            }
+
+            case "MemberExpression": {
+                const chain = captureMemberChain(node);
+                if (!chain) break;
+
+                // Highlighting doesn't care about scope, so (unlike extraction)
+                // we don't bail out for a non-global root here.
+                captureVariable(chain.root);
+                for (const prop of chain.properties) {
+                    captureProperty(prop.name, prop.start);
+                }
+                break;
+            }
+
+            case "Property": {
+                const propName = getStaticPropertyName(
+                    node.key,
+                    node.computed ?? false,
+                );
+                if (!propName) break;
+
+                // Unlike extraction, highlighting doesn't need to walk up the
+                // ancestors to find a scope prefix: every property key gets its
+                // own token regardless of nesting.
+                captureProperty(propName, node.key.start);
+                break;
+            }
+
+            case "VariableDeclaration": {
+                addToken(node.start, node.kind, ETokenType.keyword);
+                break;
+            }
+        }
+    });
+
+    return tokens;
+}
+
+/**
+ * A variable occurrence found while extracting symbols, before it's turned into a `JSVariableLabel`.
+ */
+interface RawVariableOccurrence {
+    text: string;
+    at: number;
+    defined: boolean;
+}
+
+/**
+ * A property occurrence found while extracting symbols, before it's turned into a `JSPropertyLabel`.
+ */
+interface RawPropertyOccurrence {
+    text: string;
+    at: number;
+    scope?: string;
+    defined: boolean;
+}
+
+/**
+ * Extract story-variable and story-property occurrences from a parsed JavaScript
+ * program or expression.
+ *
+ * This pass consults scope (as annotated by `annotateVariableScopes`, which must
+ * have already run) to resolve names and never cares about operators, literals,
+ * or keywords.
+ *
+ * @param ast Parsed text, already annotated by `annotateVariableScopes`.
+ * @returns Variable and property occurrences, in ascending order of position.
+ */
+function extractSymbols(ast: acorn.Node): {
+    variables: RawVariableOccurrence[];
+    properties: RawPropertyOccurrence[];
+} {
+    // Keyed by position (like the old shared token map) purely so that, when
+    // converted to an array below, occurrences come out in ascending source
+    // position order -- matching what callers (and tests) expect.
+    const variableTokens: Record<number, RawVariableOccurrence> = {};
+    const propertyTokens: Record<number, RawPropertyOccurrence> = {};
+
+    // Helper function to add a variable occurrence if it's a global and not a built-in JS object
+    const captureVariable = (id: ScopedIdentifier) => {
+        if (!id.name || id.name === "✖" || builtInObjects.has(id.name))
+            return;
+        if (id._scopeType !== "global") return;
+        variableTokens[id.start] = {
             text: id.name,
             at: id.start,
-            type: ETokenType.variable,
             defined: !!id._isDefinition,
-            global: id._scopeType === "global",
-            modifiers: [],
         };
     };
 
-    // Helper function to add a property to unprocessed tokens if it's not dynamic
+    // Helper function to add a property occurrence if it's not dynamic and has a known scope
     const captureProperty = (
         name: string,
         start: number,
         scope?: string,
         defined = false,
     ) => {
-        if (!name || name === "<dynamic>") return;
-        unprocessedTokens[start] = {
+        if (!name || name === "<dynamic>" || name === "✖") return;
+        // Properties without a scope (e.g. built-in objects') get semantic
+        // tokens but aren't otherwise tracked.
+        if (scope === undefined) return;
+        propertyTokens[start] = {
             text: name,
             at: start,
-            type: ETokenType.property,
             scope,
             defined,
-            modifiers: [],
         };
     };
 
-    const node = rawNode as acorn.AnyNode;
-    switch (node.type) {
-        case "Identifier": {
-            const ancestor = ancestors[ancestors.length - 2];
-            // Don't record placeholders, instantiated classes, function names, or built-in objects
-            if (
-                node.name !== "✖" &&
-                ancestor?.type !== "NewExpression" &&
-                ancestor?.type !== "CallExpression" &&
-                ancestor?.type !== "FunctionExpression" &&
-                ancestor?.type !== "FunctionDefinition" &&
-                ancestor?.type !== "FunctionDeclaration" &&
-                !builtInObjects.has(node.name)
-            ) {
-                captureVariable(node as ScopedIdentifier);
-            }
-            break;
-        }
-
-        case "Literal": {
-            if (node.raw !== undefined) {
-                const semanticType = typeofToSemantic[typeof node.value];
-                if (semanticType !== undefined) {
-                    unprocessedTokens[node.start] = {
-                        text: node.raw,
-                        at: node.start,
-                        type: semanticType,
-                        modifiers: [],
-                    };
+    acornWalk.fullAncestor(ast, (rawNode, _, ancestors) => {
+        const node = rawNode as acorn.AnyNode;
+        switch (node.type) {
+            case "Identifier": {
+                const role = classifyIdentifier(node, ancestors);
+                if (role === "neither") break;
+                const ancestor = ancestors[ancestors.length - 2] as
+                    | acorn.AnyNode
+                    | undefined;
+                if (!isExcludedIdentifier(role, ancestor, node)) {
+                    captureVariable(node as ScopedIdentifier);
                 }
-            }
-            break;
-        }
-
-        case "AssignmentExpression":
-        case "BinaryExpression":
-        case "LogicalExpression": {
-            const at = currentExpression.indexOf(node.operator, node.left.end);
-            unprocessedTokens[at] = {
-                text: node.operator,
-                at: at,
-                type: ETokenType.operator,
-                modifiers: [],
-            };
-            break;
-        }
-
-        case "CallExpression": {
-            if (node.callee.type === "Identifier") {
-                unprocessedTokens[node.callee.start] = {
-                    text: node.callee.name,
-                    at: node.callee.start,
-                    type: ETokenType.function,
-                    modifiers: [],
-                };
-            } else if (node.callee.type === "MemberExpression") {
-                const chain = captureMemberChain(node.callee);
-                if (chain && chain.properties) {
-                    const lastProp =
-                        chain.properties[chain.properties.length - 1];
-                    unprocessedTokens[node.callee.property.start] = {
-                        text: lastProp.name,
-                        at: lastProp.start,
-                        type: ETokenType.function,
-                        modifiers: [],
-                    };
-                }
-            }
-            break;
-        }
-
-        case "UnaryExpression":
-        case "UpdateExpression": {
-            const at = node.prefix
-                ? node.start
-                : node.end - node.operator.length;
-            unprocessedTokens[at] = {
-                text: node.operator,
-                at: at,
-                type: ETokenType.operator,
-                modifiers: [],
-            };
-            break;
-        }
-
-        case "MemberExpression": {
-            const chain = captureMemberChain(node);
-            if (!chain) break;
-
-            // If the root isn't in the global scope, bail out
-            if (chain.root._scopeType !== "global") {
                 break;
             }
 
-            const defined = isMemberExpressionDefinition(node, ancestors);
-            const isBuiltin = isBuiltinObjectScope(chain.root.name);
+            case "MemberExpression": {
+                const chain = captureMemberChain(node);
+                if (!chain) break;
 
-            // Add the root variable
-            captureVariable(chain.root);
-
-            // Track dynamic properties incrementally
-            let dynamicEncountered = false;
-
-            // Don't capture any properties
-            chain.properties.forEach((prop, i) => {
-                if (prop.name === "<dynamic>") {
-                    dynamicEncountered = true;
-                    return; // Skip capturing dynamic property itself
+                // If the root isn't in the global scope, bail out
+                if (chain.root._scopeType !== "global") {
+                    break;
                 }
 
-                // Scope is valid only until the first dynamic property
-                const scope =
-                    !dynamicEncountered && !isBuiltin
-                        ? [
-                              chain.root.name,
-                              ...chain.properties
-                                  .slice(0, i)
-                                  .map((p) => p.name),
-                          ].join(".")
-                        : undefined;
+                const defined = isMemberExpressionDefinition(node, ancestors);
+                const isBuiltin = isBuiltinObjectScope(chain.root.name);
 
-                // Only count the property as defined if it's being defined on a global variable
-                captureProperty(
-                    prop.name,
-                    prop.start,
-                    scope,
-                    defined && chain.root._scopeType === "global",
+                // Add the root variable
+                captureVariable(chain.root);
+
+                // If this member expression is itself a call's callee (e.g.
+                // `obj.method` in `obj.method(x)`), its last segment is a
+                // function reference, not a property occurrence -- that's
+                // issue 07's business, same as a plain call's callee.
+                const ancestor = ancestors[ancestors.length - 2] as
+                    | acorn.AnyNode
+                    | undefined;
+                const lastIsCallCallee =
+                    ancestor?.type === "CallExpression" &&
+                    ancestor.callee === node;
+
+                // Track dynamic properties incrementally
+                let dynamicEncountered = false;
+
+                chain.properties.forEach((prop, i) => {
+                    if (prop.name === "<dynamic>") {
+                        dynamicEncountered = true;
+                        return; // Skip capturing dynamic property itself
+                    }
+                    if (
+                        lastIsCallCallee &&
+                        i === chain.properties.length - 1
+                    ) {
+                        return; // Skip the callee's own name
+                    }
+
+                    // Scope is valid only until the first dynamic property
+                    const scope =
+                        !dynamicEncountered && !isBuiltin
+                            ? [
+                                  chain.root.name,
+                                  ...chain.properties
+                                      .slice(0, i)
+                                      .map((p) => p.name),
+                              ].join(".")
+                            : undefined;
+
+                    // Only count the property as defined if it's being defined on a global variable
+                    captureProperty(
+                        prop.name,
+                        prop.start,
+                        scope,
+                        defined && chain.root._scopeType === "global",
+                    );
+                });
+                break;
+            }
+
+            case "Property": {
+                const propName = getStaticPropertyName(
+                    node.key,
+                    node.computed ?? false,
                 );
-            });
-            break;
-        }
+                // If we're a non-static property, bail out
+                if (!propName) break;
 
-        case "Property": {
-            const propName = getStaticPropertyName(
-                node.key,
-                node.computed ?? false,
-            );
-            // If we're a non-static property, bail out
-            if (!propName) break;
+                // Find the parent scope (if any) for the property
+                let parentScope: string | undefined;
 
-            // Find the parent scope (if any) for the property
-            let parentScope: string | undefined;
+                for (let i = ancestors.length - 2; i >= 0; i--) {
+                    const ancestor = ancestors[i] as acorn.AnyNode;
 
-            for (let i = ancestors.length - 2; i >= 0; i--) {
-                const ancestor = ancestors[i] as acorn.AnyNode;
+                    // var.prop1.prop2... = { ... } (for any number of properties)
+                    if (
+                        ancestor.type === "AssignmentExpression" &&
+                        ancestor.right.type === "ObjectExpression"
+                    ) {
+                        // Get the scope from the left side to prepend to the property scopes
+                        const left = ancestor.left;
+                        if (left.type === "Identifier") {
+                            if (
+                                (left as ScopedIdentifier)._scopeType ===
+                                "global"
+                            ) {
+                                parentScope = left.name;
+                                captureObjectExpressionProperties(
+                                    ancestor.right,
+                                    parentScope,
+                                    captureProperty,
+                                );
+                            }
+                            break;
+                        } else if (left.type === "MemberExpression") {
+                            const chain = captureMemberChain(left);
+                            if (
+                                chain &&
+                                !chain.dynamic &&
+                                chain.root._scopeType === "global"
+                            ) {
+                                // If it's dynamic, then we don't save the properties
+                                parentScope = [
+                                    chain.root.name,
+                                    ...chain.properties.map((p) => p.name),
+                                ].join(".");
+                                captureObjectExpressionProperties(
+                                    ancestor.right,
+                                    parentScope,
+                                    captureProperty,
+                                );
+                                break;
+                            }
+                        }
+                    }
 
-                // var.prop1.prop2... = { ... } (for any number of properties)
-                if (
-                    ancestor.type === "AssignmentExpression" &&
-                    ancestor.right.type === "ObjectExpression"
-                ) {
-                    // Get the scope from the left side to prepend to the property scopes
-                    const left = ancestor.left;
-                    if (left.type === "Identifier") {
-                        if (
-                            (left as ScopedIdentifier)._scopeType === "global"
-                        ) {
-                            parentScope = left.name;
+                    // const obj = { ... }
+                    if (
+                        ancestor.type === "VariableDeclarator" &&
+                        ancestor.id.type === "Identifier" &&
+                        ancestor.init?.type === "ObjectExpression"
+                    ) {
+                        const id = ancestor.id as ScopedIdentifier;
+
+                        if (id._scopeType === "global") {
+                            parentScope = id.name;
                             captureObjectExpressionProperties(
-                                ancestor.right,
+                                ancestor.init,
                                 parentScope,
                                 captureProperty,
                             );
                         }
                         break;
-                    } else if (left.type === "MemberExpression") {
-                        const chain = captureMemberChain(left);
-                        if (
-                            chain &&
-                            !chain.dynamic &&
-                            chain.root._scopeType === "global"
-                        ) {
-                            // If it's dynamic, then we don't save the properties
-                            parentScope = [
-                                chain.root.name,
-                                ...chain.properties.map((p) => p.name),
-                            ].join(".");
-                            captureObjectExpressionProperties(
-                                ancestor.right,
-                                parentScope,
-                                captureProperty,
-                            );
-                            break;
-                        }
                     }
                 }
 
-                // const obj = { ... }
-                if (
-                    ancestor.type === "VariableDeclarator" &&
-                    ancestor.id.type === "Identifier" &&
-                    ancestor.init?.type === "ObjectExpression"
-                ) {
-                    const id = ancestor.id as ScopedIdentifier;
-
-                    if (id._scopeType === "global") {
-                        parentScope = id.name;
-                        captureObjectExpressionProperties(
-                            ancestor.init,
-                            parentScope,
-                            captureProperty,
-                        );
-                    }
-                    break;
-                }
+                // Capture the property. Note we blank out the scope for built-in
+                // objects so they don't get tracked as occurrences.
+                captureProperty(
+                    propName,
+                    node.key.start,
+                    isBuiltinObjectScope(parentScope || "")
+                        ? undefined
+                        : parentScope || undefined,
+                    true,
+                );
+                break;
             }
-
-            // Capture the property. Note we blank out the scope for built-in objects
-            // so their properties get semantic tokens but aren't otherwise tracked
-            captureProperty(
-                propName,
-                node.key.start,
-                isBuiltinObjectScope(parentScope || "")
-                    ? undefined
-                    : parentScope || undefined,
-                true,
-            );
-            break;
         }
+    });
 
-        case "VariableDeclaration": {
-            unprocessedTokens[node.start] = {
-                text: node.kind,
-                at: node.start,
-                type: ETokenType.keyword,
-                modifiers: [],
-            };
-            break;
-        }
-    }
+    return {
+        variables: Object.values(variableTokens),
+        properties: Object.values(propertyTokens),
+    };
+}
+
+/**
+ * Check whether every identifier that could be a story variable in a parsed
+ * JavaScript AST satisfies a caller-supplied predicate.
+ *
+ * This walks the AST once and, for each identifier that `classifyIdentifier`
+ * says is a real occurrence (not a property key, label, or import binding,
+ * and not a built-in JS object, callee/argument of `new`, or a function/arrow
+ * expression's own name/parameter), asks the predicate whether it counts as a
+ * variable. It's the same set of identifiers `extractSymbols` treats as
+ * variable occurrences, minus the scope resolution extraction needs -- useful
+ * for callers (like `isTwineScriptExpression`) that only need a yes/no answer
+ * about the identifiers themselves, not their scope.
+ *
+ * @param ast Parsed AST to walk.
+ * @param isVariable Predicate called with each candidate identifier's name and start position.
+ * @returns True if every candidate identifier satisfies the predicate.
+ */
+export function isEveryIdentifierAVariable(
+    ast: acorn.Node,
+    isVariable: (name: string, start: number) => boolean,
+): boolean {
+    let allValid = true;
+
+    acornWalk.fullAncestor(ast, (rawNode, _, ancestors) => {
+        const node = rawNode as acorn.AnyNode;
+        if (node.type !== "Identifier") return;
+
+        const role = classifyIdentifier(node, ancestors);
+        if (role === "neither") return;
+
+        const ancestor = ancestors[ancestors.length - 2] as
+            | acorn.AnyNode
+            | undefined;
+        if (isExcludedIdentifier(role, ancestor, node)) return;
+
+        if (!node.name || node.name === "✖" || builtInObjects.has(node.name))
+            return;
+
+        if (!isVariable(node.name, node.start)) allValid = false;
+    });
+
+    return allValid;
 }
 
 /**
@@ -1039,25 +1247,6 @@ export function parseJS(
 }
 
 /**
- * Tokenize parsed JavaScript.
- *
- * @param text Original unparsed text.
- * @param ast Parsed text.
- * @returns Object whose keys are the token's location in the unparsed text and whose values are unprocessed tokens.
- */
-export function tokenizeParsedJS(
-    text: string,
-    ast: acorn.Node,
-): Record<number, astUnprocessedToken> {
-    currentExpression = text;
-    unprocessedTokens = {};
-
-    acornWalk.fullAncestor(ast, fullAncestorTokenizingCallback);
-
-    return { ...unprocessedTokens };
-}
-
-/**
  * Tokenize a JavaScript program or expression and find referenced variables and properties in it.
  *
  * Returned properties are only those for which the parser could trace their "ownership"
@@ -1089,35 +1278,9 @@ export function tokenizeJavaScript(
     if (ast !== undefined) {
         annotateVariableScopes(ast, !!assignmentIsDefinition);
 
-        const tokens = tokenizeParsedJS(text, ast);
-
-        for (const token of Object.values(tokens)) {
-            // Capture global variables
-            if (token.type === ETokenType.variable && token.global) {
-                tokenized.variables.push({
-                    contents: token.text,
-                    location: createLocationFor(
-                        token.text,
-                        offset + token.at,
-                        document,
-                    ),
-                    defined: token.defined,
-                });
-            } else if (
-                token.type === ETokenType.property &&
-                token.scope !== undefined
-            ) {
-                tokenized.properties.push({
-                    contents: token.text,
-                    location: createLocationFor(
-                        token.text,
-                        offset + token.at,
-                        document,
-                    ),
-                    prefix: token.scope,
-                    defined: token.defined,
-                });
-            }
+        // Highlighting pass: every token, no scope.
+        const semanticTokens = computeSemanticTokens(text, ast);
+        for (const token of Object.values(semanticTokens)) {
             capturePreSemanticTokenFor(
                 token.text,
                 offset + token.at,
@@ -1125,6 +1288,32 @@ export function tokenizeJavaScript(
                 token.modifiers,
                 storyFormatState,
             );
+        }
+
+        // Extraction pass: scope-resolved variables and properties, no operators/literals/keywords.
+        const { variables, properties } = extractSymbols(ast);
+        for (const variable of variables) {
+            tokenized.variables.push({
+                contents: variable.text,
+                location: createLocationFor(
+                    variable.text,
+                    offset + variable.at,
+                    document,
+                ),
+                defined: variable.defined,
+            });
+        }
+        for (const property of properties) {
+            tokenized.properties.push({
+                contents: property.text,
+                location: createLocationFor(
+                    property.text,
+                    offset + property.at,
+                    document,
+                ),
+                prefix: property.scope,
+                defined: property.defined,
+            });
         }
     }
 
