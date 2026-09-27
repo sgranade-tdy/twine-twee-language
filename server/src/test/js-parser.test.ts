@@ -1408,18 +1408,26 @@ describe("JS Parser", () => {
             },
             {
                 description:
-                    "for (let i=0;i<n;i++){i} // defect 2: loop head leaks `i`",
+                    "for (let i=0;i<n;i++){i} // defect 2, fixed by ticket 03: the loop head now opens its own scope, so `i` no longer leaks",
                 input: "for (let i=0;i<n;i++){i}",
                 isProgram: true,
-                variables: ["i=", "i", "n", "i", "i"], // defect 2
+                variables: ["n"], // defect 2, fixed
                 properties: [],
             },
             {
                 description:
-                    "for (var j in obj){j} // defect 2: loop head leaks `j`",
+                    "for (var j in obj){j} // defect 2, fixed by ticket 03: the loop head now opens its own scope, but `var` still hoists `j` to the global scope, so it's unaffected",
                 input: "for (var j in obj){j}",
                 isProgram: true,
-                variables: ["j=", "obj", "j"], // defect 2
+                variables: ["j=", "obj", "j"],
+                properties: [],
+            },
+            {
+                description:
+                    "for (const x of xs){x} // defect 2, fixed by ticket 03: `const`/`let` bind per-iteration in the loop's own scope",
+                input: "for (const x of xs){x}",
+                isProgram: true,
+                variables: ["xs"], // defect 2, fixed
                 properties: [],
             },
             {
@@ -1438,17 +1446,42 @@ describe("JS Parser", () => {
             },
             {
                 description:
-                    "try{a()}catch(e){e.message} // defect 3 (partial, ticket 02): the ancestors off-by-one that misclassified the catch param as a reference is fixed, so the param itself no longer leaks; `e.message` still resolves globally because CatchClause still doesn't open a scope (ticket 03)",
+                    "try{a()}catch(e){e.message} // defect 3, fixed by ticket 03: CatchClause now opens a scope, so `e` binds and `e.message` no longer resolves globally",
                 input: "try{a()}catch(e){e.message}",
                 isProgram: true,
-                variables: ["e"], // defect 3, remainder
-                properties: ["e.message"], // defect 3, remainder
+                variables: [], // defect 3, fixed
+                properties: [], // defect 3, fixed
             },
             {
-                description: "class A {} // defect 4: class name unbound",
+                description:
+                    "try{a()}catch({message}){message} // defect 3, fixed by ticket 03: destructured catch params bind too",
+                input: "try{a()}catch({message}){message}",
+                isProgram: true,
+                variables: [],
+                properties: [],
+            },
+            {
+                description:
+                    "class A {} // defect 4, fixed by ticket 03: the class name now binds; as a global declaration, it counts as a definition",
                 input: "class A {}",
                 isProgram: true,
-                variables: ["A"], // defect 4
+                variables: ["A="], // defect 4, fixed
+                properties: [],
+            },
+            {
+                description:
+                    "class A { foo(){} [bar](){} } // defect 4: method keys are property keys, not references, so they don't leak (a computed key is still a reference)",
+                input: "class A { foo(){} [bar](){} }",
+                isProgram: true,
+                variables: ["A=", "bar"],
+                properties: [],
+            },
+            {
+                description:
+                    "const B = class Named { foo(){ return Named } } // defect 4: a class expression's name binds only inside its own body",
+                input: "const B = class Named { foo(){ return Named } }",
+                isProgram: true,
+                variables: ["B="],
                 properties: [],
             },
             {
@@ -1764,10 +1797,10 @@ describe("JS Parser", () => {
             },
             {
                 description:
-                    "class A { foo = 1 } // defect 7: ES2022 class field fails under EcmaVersion 2020",
+                    "class A { foo = 1 } // defect 7: ES2022 class field fails under EcmaVersion 2020; `A=` reflects ticket 03's class-name fix, not this defect",
                 input: "class A { foo = 1 }",
                 isProgram: true,
-                variables: ["A"],
+                variables: ["A="],
                 properties: [],
                 error: "Opening '{' is missing a matching '}'", // defect 7
             },

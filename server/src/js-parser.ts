@@ -378,8 +378,20 @@ function classifyIdentifier(
                 ? "neither"
                 : "reference";
 
+        case "MethodDefinition":
+        case "PropertyDefinition":
+            // Non-computed key is a property name, not a variable -- same
+            // reasoning as "Property"
+            return parent.key === node && !parent.computed
+                ? "neither"
+                : "reference";
+
         case "CatchClause":
             return parent.param === node ? "declaration" : "reference";
+
+        case "ClassDeclaration":
+        case "ClassExpression":
+            return parent.id === node ? "declaration" : "reference";
 
         case "LabeledStatement":
         case "BreakStatement":
@@ -470,6 +482,90 @@ function annotateVariableScopes(
                     if (decl.init)
                         visit(decl.init, scope, [...ancestors, decl.init]);
                 }
+                return;
+            }
+
+            case "ForStatement": {
+                // The loop head gets its own scope: `let`/`const` bind
+                // per-iteration there, while `var` still hoists out to the
+                // nearest function scope via `bindIdentifier`.
+                const loopScope = createScope("block", scope);
+                if (node.init)
+                    visit(node.init, loopScope, [...ancestors, node.init]);
+                if (node.test)
+                    visit(node.test, loopScope, [...ancestors, node.test]);
+                if (node.update)
+                    visit(node.update, loopScope, [...ancestors, node.update]);
+                visit(node.body, loopScope, [...ancestors, node.body]);
+                return;
+            }
+
+            case "ForOfStatement":
+            case "ForInStatement": {
+                // Same reasoning as ForStatement: the loop head (`left`) is
+                // its own scope. `left` may be a VariableDeclaration (bound
+                // here) or an existing reference (e.g. `for (a of b)`).
+                const loopScope = createScope("block", scope);
+                visit(node.left, loopScope, [...ancestors, node.left]);
+                visit(node.right, loopScope, [...ancestors, node.right]);
+                visit(node.body, loopScope, [...ancestors, node.body]);
+                return;
+            }
+
+            case "CatchClause": {
+                const catchScope = createScope("block", scope);
+                if (node.param) {
+                    // The param is a pattern -- `catch ({message})` is legal.
+                    collectPatternIdentifiers(
+                        node.param as acorn.AnyNode,
+                        (id) => {
+                            bindIdentifier(catchScope, id.name, "param");
+                        },
+                    );
+                }
+                visit(node.body, catchScope, [...ancestors, node.body]);
+                return;
+            }
+
+            case "ClassDeclaration": {
+                if (node.id) {
+                    const boundScope = bindIdentifier(
+                        scope,
+                        node.id.name,
+                        "function",
+                    );
+                    (node.id as ScopedIdentifier)._isDefinition = true;
+                    (node.id as ScopedIdentifier)._scopeType = boundScope.type;
+                }
+                if (node.superClass)
+                    visit(node.superClass, scope, [
+                        ...ancestors,
+                        node.superClass,
+                    ]);
+                visit(node.body, scope, [...ancestors, node.body]);
+                return;
+            }
+
+            case "ClassExpression": {
+                // Unlike a class declaration's name, a class expression's
+                // name is only visible inside its own body.
+                let bodyScope = scope;
+                if (node.id) {
+                    bodyScope = createScope("block", scope);
+                    const boundScope = bindIdentifier(
+                        bodyScope,
+                        node.id.name,
+                        "function",
+                    );
+                    (node.id as ScopedIdentifier)._isDefinition = true;
+                    (node.id as ScopedIdentifier)._scopeType = boundScope.type;
+                }
+                if (node.superClass)
+                    visit(node.superClass, scope, [
+                        ...ancestors,
+                        node.superClass,
+                    ]);
+                visit(node.body, bodyScope, [...ancestors, node.body]);
                 return;
             }
 
