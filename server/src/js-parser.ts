@@ -28,7 +28,6 @@ const typeofToSemantic: Record<string, TokenType> = {
     boolean: ETokenType.keyword,
 };
 
-
 /**
  * Label for a parsed javascript variable.
  */
@@ -95,6 +94,8 @@ export interface TokenizedJS {
     error?: JSDiagnostic;
 }
 
+// The marker `acorn-loose` uses for a missing identifier.
+const MISSING_IDENTIFIER = "✖";
 
 const builtInObjects = new Set([
     // Taken from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
@@ -325,9 +326,9 @@ function collectPatternIdentifiers(
  * How an identifier functions in the AST: whether it's a declaration
  * (a name being bound, e.g. `var`/`let`/`const`, a function name or
  * parameter, or a `catch` parameter), a reference (an occurrence that reads
- * -- or, if the caller treats assignment as definition, writes -- a bound or
- * unbound name), or neither (a property key, a label, or an import binding,
- * none of which are ever variables).
+ * -- or, if the caller forces assignments to count as writes, writes -- a
+ * bound or unbound name), or neither (a property key, a label, or an import
+ * binding, none of which are ever variables).
  *
  * This is the single source of truth for that question. Both the scope-
  * annotating walk (which needs to know whether to bind a name) and the
@@ -336,6 +337,17 @@ function collectPatternIdentifiers(
  * from ancestor types themselves.
  */
 type IdentifierRole = "declaration" | "reference" | "neither";
+
+/**
+ * Get a node's parent from its ancestors.
+ *
+ * @param ancestors Node's ancestors, ending with the node itself (the
+ * acorn-walk `fullAncestor` convention).
+ * @returns The node's parent, or undefined if it has none.
+ */
+function parentOf(ancestors: acorn.Node[]): acorn.AnyNode | undefined {
+    return ancestors[ancestors.length - 2] as acorn.AnyNode | undefined;
+}
 
 /**
  * Classify an identifier given its ancestors.
@@ -349,7 +361,7 @@ function classifyIdentifier(
     node: acorn.AnyNode,
     ancestors: acorn.Node[],
 ): IdentifierRole {
-    const parent = ancestors[ancestors.length - 2] as acorn.AnyNode | undefined;
+    const parent = parentOf(ancestors);
 
     // Consider parent-less identifiers as a reference for times when we just parse the tiniest snippet
     if (!parent) return "reference";
@@ -580,8 +592,7 @@ function annotateVariableScopes(
 
                 // ...unless it's the LHS of an assignment and we're forcing assignment to be definition
                 if (assignmentIsDefinition) {
-                    const parent = ancestors[ancestors.length - 2] as
-                        acorn.AnyNode | undefined;
+                    const parent = parentOf(ancestors);
                     if (
                         parent &&
                         parent.type === "AssignmentExpression" &&
@@ -655,9 +666,8 @@ function getStaticPropertyName(
     computed: boolean,
 ): string | undefined {
     if (!computed && property.type === "Identifier") {
-        // Loose parsing can synthesize a `✖` placeholder identifier for a
-        // missing property name (e.g. `obj.`); never treat it as a real name.
-        return property.name !== "✖" ? property.name : undefined;
+        // Don't treat a missing identifier marker from loose parsing as a name.
+        return property.name !== MISSING_IDENTIFIER ? property.name : undefined;
     }
 
     if (
@@ -682,7 +692,7 @@ function isMemberExpressionDefinition(
     node: acorn.MemberExpression,
     ancestors: acorn.Node[],
 ): boolean {
-    const parent = ancestors[ancestors.length - 2] as acorn.AnyNode | undefined;
+    const parent = parentOf(ancestors);
     return parent?.type === "AssignmentExpression" && parent.left === node;
 }
 
@@ -784,42 +794,81 @@ function captureObjectExpressionProperties(
 }
 
 /**
- * Is an identifier's immediate ancestor a call/new callee or an excluded
- * declaration (a function/arrow expression's own name or parameter)?
+ * Is an identifier excluded because of its immediate parent: a call/`new`
+ * callee, a shorthand property's value, or a function's own name or
+ * parameter?
  *
- * Shared by both passes so neither re-derives the same exclusion rules
- * differently. A call or `new` expression's callee (`foo` in `foo(bar)`,
- * `Foo` in `new Foo(bar)`) isn't a story-variable occurrence yet -- it's a
- * function/constructor reference, which is issue 07's business. Neither are
- * `new Foo(bar)`'s arguments (also issue 07). Nor are a function or arrow
- * expression's own name and parameters (issue 06 is what starts treating
- * declarations as story-variable writes). Nor -- pre-existing defect 10,
- * out of scope here -- is a shorthand object-literal property's value (e.g.
- * `a` in `{a}`): its position collides with its own key, so it's always
- * reported as the property, never as the variable read it also is. Everything
- * else -- references, including plain call arguments, plus
+ * A call or `new` expression's callee (`foo` in `foo(bar)`, `Foo` in
+ * `new Foo(bar)`) isn't a story-variable occurrence yet -- it's a
+ * function/constructor reference, which is issue 07's business. Their
+ * arguments, though, are ordinary reads. Nor are a function declaration's or
+ * function expression's own name and parameters occurrences (issue 06 is what
+ * starts treating declarations as story-variable writes). Arrow-function
+ * parameters aren't excluded here: they never resolve to a story variable
+ * because they're never scope-annotated, but they're still highlighted as
+ * variables. Nor -- pre-existing defect 10, out of scope here -- is a
+ * shorthand object-literal property's value (e.g. `a` in `{a}`): its position
+ * collides with its own key, so it's always reported as the property, never as
+ * the variable read it also is. Everything else -- references, plus
  * `var`/`let`/`const` and `catch` declarations -- is a real occurrence today.
  *
  * @param role The identifier's classified role.
- * @param ancestor The identifier's immediate parent node, if any.
- * @param node The identifier (or, for a member-expression callee, the outermost `MemberExpression`) itself.
+ * @param parent The identifier's immediate parent node, if any.
+ * @param node The identifier itself.
  * @returns True if the identifier should be excluded from both highlighting and extraction.
  */
 function isExcludedIdentifier(
     role: IdentifierRole,
-    ancestor: acorn.AnyNode | undefined,
+    parent: acorn.AnyNode | undefined,
     node: acorn.AnyNode,
 ): boolean {
-    if (ancestor?.type === "NewExpression") return true;
-    if (ancestor?.type === "CallExpression" && ancestor.callee === node)
+    if (
+        (parent?.type === "CallExpression" ||
+            parent?.type === "NewExpression") &&
+        parent.callee === node
+    )
         return true;
-    if (ancestor?.type === "Property" && ancestor.shorthand) return true;
+    if (parent?.type === "Property" && parent.shorthand) return true;
     return (
         role === "declaration" &&
-        (ancestor?.type === "FunctionDeclaration" ||
-            ancestor?.type === "FunctionExpression" ||
-            ancestor?.type === "ArrowFunctionExpression")
+        (parent?.type === "FunctionDeclaration" ||
+            parent?.type === "FunctionExpression")
     );
+}
+
+/**
+ * Is the name potentially a variable we want to track?
+ *
+ * We don't track empty names, missing identifiers from loose
+ * parsing, or built-in JS objects.
+ *
+ * @param name Identifier name.
+ * @returns True if the name could be a variable to be tracked.
+ */
+function isPotentialTrackedVariableName(name: string): boolean {
+    return !!name && name !== MISSING_IDENTIFIER && !builtInObjects.has(name);
+}
+
+/**
+ * Is an identifier a candidate variable occurrence -- that is, one that
+ * highlighting marks as a variable and extraction considers (subject to scope)
+ * as a story variable?
+ *
+ * This is the one place every pass asks that question, combining
+ * `classifyIdentifier`, `isExcludedIdentifier`, and `isTrackableVariableName`.
+ *
+ * @param node Identifier to test.
+ * @param ancestors Node's ancestors, ending with `node` itself.
+ * @returns True if the identifier is a candidate variable occurrence.
+ */
+function isCandidateVariable(
+    node: acorn.Identifier,
+    ancestors: acorn.Node[],
+): boolean {
+    const role = classifyIdentifier(node, ancestors);
+    if (role === "neither") return false;
+    if (isExcludedIdentifier(role, parentOf(ancestors), node)) return false;
+    return isPotentialTrackedVariableName(node.name);
 }
 
 /**
@@ -860,14 +909,13 @@ function computeSemanticTokens(
 
     // Helper function to add a variable token if it's not a built-in JS object
     const captureVariable = (id: ScopedIdentifier) => {
-        if (!id.name || id.name === "✖" || builtInObjects.has(id.name))
-            return;
+        if (!isPotentialTrackedVariableName(id.name)) return;
         addToken(id.start, id.name, ETokenType.variable);
     };
 
     // Helper function to add a property token if it's not dynamic
     const captureProperty = (name: string, start: number) => {
-        if (!name || name === "<dynamic>" || name === "✖") return;
+        if (!name || name === "<dynamic>") return;
         addToken(start, name, ETokenType.property);
     };
 
@@ -875,12 +923,7 @@ function computeSemanticTokens(
         const node = rawNode as acorn.AnyNode;
         switch (node.type) {
             case "Identifier": {
-                const role = classifyIdentifier(node, ancestors);
-                if (role === "neither") break;
-                const ancestor = ancestors[ancestors.length - 2] as
-                    | acorn.AnyNode
-                    | undefined;
-                if (!isExcludedIdentifier(role, ancestor, node)) {
+                if (isCandidateVariable(node, ancestors)) {
                     captureVariable(node as ScopedIdentifier);
                 }
                 break;
@@ -913,9 +956,10 @@ function computeSemanticTokens(
                     );
                 } else if (node.callee.type === "MemberExpression") {
                     const chain = captureMemberChain(node.callee);
-                    if (chain && chain.properties) {
-                        const lastProp =
-                            chain.properties[chain.properties.length - 1];
+                    const lastProp = chain?.properties.at(-1);
+                    // A non-static callee (`obj[k](x)`) has no name to mark
+                    // as a function; `k` keeps its own variable token.
+                    if (lastProp && lastProp.name !== "<dynamic>") {
                         addToken(
                             lastProp.start,
                             lastProp.name,
@@ -940,7 +984,7 @@ function computeSemanticTokens(
                 if (!chain) break;
 
                 // Highlighting doesn't care about scope, so (unlike extraction)
-                // we don't bail out for a non-global root here.
+                // we don't bail out for a locally bound root here.
                 captureVariable(chain.root);
                 for (const prop of chain.properties) {
                     captureProperty(prop.name, prop.start);
@@ -1012,10 +1056,9 @@ function extractSymbols(ast: acorn.Node): {
     const variableTokens: Record<number, RawVariableOccurrence> = {};
     const propertyTokens: Record<number, RawPropertyOccurrence> = {};
 
-    // Helper function to add a variable occurrence if it's a global and not a built-in JS object
+    // Helper function to add a variable occurrence if it's an unbound (story) variable and not a built-in JS object
     const captureVariable = (id: ScopedIdentifier) => {
-        if (!id.name || id.name === "✖" || builtInObjects.has(id.name))
-            return;
+        if (!isPotentialTrackedVariableName(id.name)) return;
         if (id._scopeType !== "global") return;
         variableTokens[id.start] = {
             text: id.name,
@@ -1031,7 +1074,7 @@ function extractSymbols(ast: acorn.Node): {
         scope?: string,
         defined = false,
     ) => {
-        if (!name || name === "<dynamic>" || name === "✖") return;
+        if (!name || name === "<dynamic>") return;
         // Properties without a scope (e.g. built-in objects') get semantic
         // tokens but aren't otherwise tracked.
         if (scope === undefined) return;
@@ -1047,12 +1090,7 @@ function extractSymbols(ast: acorn.Node): {
         const node = rawNode as acorn.AnyNode;
         switch (node.type) {
             case "Identifier": {
-                const role = classifyIdentifier(node, ancestors);
-                if (role === "neither") break;
-                const ancestor = ancestors[ancestors.length - 2] as
-                    | acorn.AnyNode
-                    | undefined;
-                if (!isExcludedIdentifier(role, ancestor, node)) {
+                if (isCandidateVariable(node, ancestors)) {
                     captureVariable(node as ScopedIdentifier);
                 }
                 break;
@@ -1062,7 +1100,7 @@ function extractSymbols(ast: acorn.Node): {
                 const chain = captureMemberChain(node);
                 if (!chain) break;
 
-                // If the root isn't in the global scope, bail out
+                // If the root is locally bound (not a story variable), bail out
                 if (chain.root._scopeType !== "global") {
                     break;
                 }
@@ -1077,12 +1115,9 @@ function extractSymbols(ast: acorn.Node): {
                 // `obj.method` in `obj.method(x)`), its last segment is a
                 // function reference, not a property occurrence -- that's
                 // issue 07's business, same as a plain call's callee.
-                const ancestor = ancestors[ancestors.length - 2] as
-                    | acorn.AnyNode
-                    | undefined;
+                const parent = parentOf(ancestors);
                 const lastIsCallCallee =
-                    ancestor?.type === "CallExpression" &&
-                    ancestor.callee === node;
+                    parent?.type === "CallExpression" && parent.callee === node;
 
                 // Track dynamic properties incrementally
                 let dynamicEncountered = false;
@@ -1092,10 +1127,7 @@ function extractSymbols(ast: acorn.Node): {
                         dynamicEncountered = true;
                         return; // Skip capturing dynamic property itself
                     }
-                    if (
-                        lastIsCallCallee &&
-                        i === chain.properties.length - 1
-                    ) {
+                    if (lastIsCallCallee && i === chain.properties.length - 1) {
                         return; // Skip the callee's own name
                     }
 
@@ -1110,7 +1142,7 @@ function extractSymbols(ast: acorn.Node): {
                               ].join(".")
                             : undefined;
 
-                    // Only count the property as defined if it's being defined on a global variable
+                    // Only count the property as assigned if its root is a story variable
                     captureProperty(
                         prop.name,
                         prop.start,
@@ -1222,14 +1254,14 @@ function extractSymbols(ast: acorn.Node): {
  * Check whether every identifier that could be a story variable in a parsed
  * JavaScript AST satisfies a caller-supplied predicate.
  *
- * This walks the AST once and, for each identifier that `classifyIdentifier`
- * says is a real occurrence (not a property key, label, or import binding,
- * and not a built-in JS object, callee/argument of `new`, or a function/arrow
- * expression's own name/parameter), asks the predicate whether it counts as a
- * variable. It's the same set of identifiers `extractSymbols` treats as
- * variable occurrences, minus the scope resolution extraction needs -- useful
- * for callers (like `isTwineScriptExpression`) that only need a yes/no answer
- * about the identifiers themselves, not their scope.
+ * This walks the AST once and, for each identifier `isCandidateVariable`
+ * accepts (not a property key, label, import binding, built-in JS object,
+ * call/`new` callee, or a function declaration's/expression's own
+ * name/parameter), asks the predicate whether it counts as a variable. It's
+ * the same set of identifiers `extractSymbols` treats as variable occurrences,
+ * minus the scope resolution extraction needs -- useful for callers (like
+ * `isTwineScriptExpression`) that only need a yes/no answer about the
+ * identifiers themselves, not their scope.
  *
  * @param ast Parsed AST to walk.
  * @param isVariable Predicate called with each candidate identifier's name and start position.
@@ -1244,17 +1276,7 @@ export function isEveryIdentifierAVariable(
     acornWalk.fullAncestor(ast, (rawNode, _, ancestors) => {
         const node = rawNode as acorn.AnyNode;
         if (node.type !== "Identifier") return;
-
-        const role = classifyIdentifier(node, ancestors);
-        if (role === "neither") return;
-
-        const ancestor = ancestors[ancestors.length - 2] as
-            | acorn.AnyNode
-            | undefined;
-        if (isExcludedIdentifier(role, ancestor, node)) return;
-
-        if (!node.name || node.name === "✖" || builtInObjects.has(node.name))
-            return;
+        if (!isCandidateVariable(node, ancestors)) return;
 
         if (!isVariable(node.name, node.start)) allValid = false;
     });

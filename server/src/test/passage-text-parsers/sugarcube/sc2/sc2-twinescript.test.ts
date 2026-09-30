@@ -215,6 +215,30 @@ describe("SugarCube TwineScript", () => {
 
             expect(result).to.be.true;
         });
+
+        it("should return false for a bare word passed to a function", () => {
+            // No arrange
+
+            const result = uut.isTwineScriptExpression("random(bareWord)");
+
+            expect(result).to.be.false;
+        });
+
+        it("should return false for a bare word passed to a constructor", () => {
+            // No arrange
+
+            const result = uut.isTwineScriptExpression("new Date(bareWord)");
+
+            expect(result).to.be.false;
+        });
+
+        it("should return true for a SugarCube variable passed to a constructor", () => {
+            // No arrange
+
+            const result = uut.isTwineScriptExpression("new Date($when)");
+
+            expect(result).to.be.true;
+        });
     });
 
     describe("tokenize TwineScript", () => {

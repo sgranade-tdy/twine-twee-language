@@ -456,6 +456,93 @@ describe("JS Parser", () => {
                 modifiers: [],
             });
         });
+
+        describe("Identifier Edge Cases", () => {
+            /**
+             * Tokenize `input` at offset 0 and return the semantic tokens as
+             * compact `text@at:type` strings, in position order.
+             */
+            function tokensFor(input: string, isProgram = true): string[] {
+                const state = buildParsingState({
+                    uri: "fake-uri",
+                    content: input,
+                    callbacks: new MockCallbacks(),
+                });
+                const storyState: StoryFormatParsingState = {
+                    passageTokens: {},
+                };
+
+                uut.tokenizeJavaScript(
+                    isProgram,
+                    input,
+                    0,
+                    state.textDocument,
+                    storyState,
+                );
+
+                const typeNames = Object.fromEntries(
+                    Object.entries(ETokenType).map(([k, v]) => [v, k]),
+                );
+                return Object.values(storyState.passageTokens).map(
+                    (t) => `${t.text}@${t.at}:${typeNames[t.type]}`,
+                );
+            }
+
+            it("should set a variable token for an arrow function's parameter", () => {
+                const result = tokensFor("(a) => a", false);
+
+                expect(result).to.eql(["a@1:variable", "a@7:variable"]);
+            });
+
+            it("should not set a variable token for a function expression's parameter", () => {
+                const result = tokensFor("f = function(a){ a }");
+
+                expect(result).to.eql([
+                    "f@0:variable",
+                    "=@2:operator",
+                    "a@17:variable",
+                ]);
+            });
+
+            it("should set a property token on a member of a function-local variable", () => {
+                const result = tokensFor("function f(o){ o.x }");
+
+                expect(result).to.eql(["o@15:variable", "x@17:property"]);
+            });
+
+            it("should set a variable token for a constructor's argument but not its callee", () => {
+                const result = tokensFor("new Foo(bar)");
+
+                expect(result).to.eql(["bar@8:variable"]);
+            });
+
+            it("should not set a function token for a computed, non-static callee", () => {
+                const result = tokensFor("obj[x](y)");
+
+                expect(result).to.eql([
+                    "obj@0:variable",
+                    "x@4:variable",
+                    "y@7:variable",
+                ]);
+            });
+
+            it("should set a function token for a computed string-literal callee", () => {
+                const result = tokensFor('obj["m"](x)');
+
+                expect(result).to.eql([
+                    "obj@0:variable",
+                    '"m"@4:string',
+                    "m@5:function",
+                    "x@9:variable",
+                ]);
+            });
+
+            it("should not set tokens for labels", () => {
+                const result = tokensFor("l: while(a){ continue l }");
+
+                expect(result).to.eql(["a@9:variable"]);
+            });
+        });
     });
 
     describe("Returned Variables", () => {
@@ -1635,10 +1722,35 @@ describe("JS Parser", () => {
                 properties: [],
             },
             {
-                description: "new Foo(bar)",
+                description:
+                    "new Foo(bar) // defect 1, remainder fixed: `new` arguments are no longer excluded, only the callee",
                 input: "new Foo(bar)",
                 isProgram: true,
-                variables: [],
+                variables: ["bar"],
+                properties: [],
+            },
+            {
+                description:
+                    "new a.B(x) // a member-expression constructor still yields its chain; the argument now shows too",
+                input: "new a.B(x)",
+                isProgram: true,
+                variables: ["a", "x"],
+                properties: ["a.B"],
+            },
+            {
+                description:
+                    'obj["m"](x) // a string-literal callee is skipped like obj.m(x)\'s (ticket 02; issue 07 reverses this)',
+                input: 'obj["m"](x)',
+                isProgram: true,
+                variables: ["obj", "x"],
+                properties: [],
+            },
+            {
+                description:
+                    "obj[k](x) // a dynamic callee's index is a read like any other",
+                input: "obj[k](x)",
+                isProgram: true,
+                variables: ["obj", "k", "x"],
                 properties: [],
             },
             {
@@ -1811,6 +1923,24 @@ describe("JS Parser", () => {
                 variables: ["a="],
                 properties: [],
                 error: "'import' and 'export' may appear only with 'sourceType: module'",
+            },
+
+            // --- Labels ---
+            {
+                description:
+                    "l: for(;;){ break l } // a label is never a variable",
+                input: "l: for(;;){ break l }",
+                isProgram: true,
+                variables: [],
+                properties: [],
+            },
+            {
+                description:
+                    "l: while(a){ continue l } // a label is never a variable",
+                input: "l: while(a){ continue l }",
+                isProgram: true,
+                variables: ["a"],
+                properties: [],
             },
         ];
 
