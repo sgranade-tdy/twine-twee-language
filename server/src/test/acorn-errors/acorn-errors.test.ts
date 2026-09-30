@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import "mocha";
 
+import { EcmaVersion } from "../../js-parser";
 import { ParserWithState } from "../../acorn-errors/parser-state";
 
 import * as uut from "../../acorn-errors";
@@ -21,7 +22,10 @@ interface TestCase {
  * SyntaxError, or throw if the input actually parses.
  */
 function parseAndCaptureError(input: string): uut.AcornSyntaxError {
-    ParserWithState.parse(input, { ecmaVersion: 2020, sourceType: "script" });
+    ParserWithState.parse(input, {
+        ecmaVersion: EcmaVersion,
+        sourceType: "script",
+    });
     throw new Error(`expected "${input}" to fail to parse, but it parsed`);
 }
 
@@ -87,11 +91,11 @@ const testCases: TestCase[] = [
         description:
             "generic sweep: numeric literal followed by identifier " +
             "(updated in phase 02: dejargon rewrites this message)",
-        input: "1_",
+        input: "1identifier",
         expectedMessage:
             "Missing space between a number and the following identifier",
-        expectedStart: 1,
-        expectedEnd: 2,
+        expectedStart: 10,
+        expectedEnd: 11,
     },
 
     // --- Broken JavaScript harvested from existing story-format test fixtures ---
