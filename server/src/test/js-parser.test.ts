@@ -1817,19 +1817,18 @@ describe("JS Parser", () => {
             },
             {
                 description:
-                    "RegExp.test(a) // defect 8: RegExp missing from builtInObjects; `a` now shows per defect 1's fix (ticket 02)",
+                    "RegExp.test(a)",
                 input: "RegExp.test(a)",
                 isProgram: true,
-                variables: ["RegExp", "a"], // defect 8
+                variables: ["a"],
                 properties: [],
             },
             {
-                description:
-                    "globalThis.z = 1 // defect 8: globalThis missing from builtInObjects",
+                description: "globalThis.z = 1",
                 input: "globalThis.z = 1",
                 isProgram: true,
-                variables: ["globalThis"], // defect 8
-                properties: ["globalThis.z="], // defect 8
+                variables: [],
+                properties: [],
             },
             {
                 description: "this.foo = 1",
