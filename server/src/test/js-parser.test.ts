@@ -1307,7 +1307,9 @@ describe("JS Parser", () => {
          * today, defects included. Rows tagged `// defect N` reproduce a row
          * from the numbered table in `.scratch/js-parser-scrub/spec.md`; later
          * issues change exactly those rows once the underlying defect is
-         * fixed, so the diff shows the behaviour change.
+         * fixed, so the diff shows the behaviour change. Rows tagged
+         * `// ticket N` are wrong by the spec's rules but not in that table;
+         * ticket N is expected to change them.
          */
         interface TestCase {
             description: string;
@@ -1320,10 +1322,13 @@ describe("JS Parser", () => {
         }
 
         /**
-         * Tokenize `input` the same way `tokenizeJavaScript` does and reduce
-         * the result to the corpus's compact string form.
+         * Reduce a `tokenizeJavaScript` result to the corpus's compact string
+         * form. A property name containing `.` or `=` is JSON-quoted
+         * (`obj."a.b"`) so it can't be mistaken for a longer chain or a write.
          */
         function compact(result: uut.TokenizedJS) {
+            const name = (s: string) =>
+                /[.=]/.test(s) ? JSON.stringify(s) : s;
             return {
                 variables: result.variables.map(
                     (v) => v.contents + (v.defined ? "=" : ""),
@@ -1331,7 +1336,7 @@ describe("JS Parser", () => {
                 properties: result.properties.map(
                     (p) =>
                         (p.prefix !== undefined ? p.prefix + "." : "") +
-                        p.contents +
+                        name(p.contents) +
                         (p.defined ? "=" : ""),
                 ),
                 error: result.error?.message,
@@ -1345,14 +1350,14 @@ describe("JS Parser", () => {
                 input: "a.b = 1",
                 isProgram: true,
                 variables: ["a"],
-                properties: ["a.b="],
+                properties: ["a.b="], // ticket 12: without the flag, a property assignment should be a read
             },
             {
                 description: "obj.a.b.c = 1",
                 input: "obj.a.b.c = 1",
                 isProgram: true,
                 variables: ["obj"],
-                properties: ["obj.a=", "obj.a.b=", "obj.a.b.c="],
+                properties: ["obj.a=", "obj.a.b=", "obj.a.b.c="], // ticket 12: only `obj.a.b.c` is a write, and only with the flag
             },
             {
                 description: "obj?.a?.b",
@@ -1381,6 +1386,20 @@ describe("JS Parser", () => {
                 isProgram: false,
                 variables: ["obj"],
                 properties: ["obj.a b"],
+            },
+            {
+                description: "obj['a.b'] // key with a dot is quoted",
+                input: "obj['a.b']",
+                isProgram: false,
+                variables: ["obj"],
+                properties: ['obj."a.b"'],
+            },
+            {
+                description: "obj['k='] // key with an equals sign is quoted",
+                input: "obj['k=']",
+                isProgram: false,
+                variables: ["obj"],
+                properties: ['obj."k="'],
             },
             {
                 description: "obj[i].name",
@@ -1417,14 +1436,14 @@ describe("JS Parser", () => {
                 input: "obj = {a: {b: 1}}",
                 isProgram: true,
                 variables: ["obj"],
-                properties: ["obj.a=", "obj.a.b="],
+                properties: ["obj.a=", "obj.a.b="], // ticket 12: without the flag, object-literal keys of a bare assignment should be reads
             },
             {
                 description: "obj.x = {a: 1}",
                 input: "obj.x = {a: 1}",
                 isProgram: true,
                 variables: ["obj"],
-                properties: ["obj.x=", "obj.x.a="],
+                properties: ["obj.x=", "obj.x.a="], // ticket 12: without the flag, `obj.x` and its literal keys should be reads
             },
             {
                 description: "var obj = {a: 1}",
@@ -1438,14 +1457,14 @@ describe("JS Parser", () => {
                 input: "obj = {a}",
                 isProgram: true,
                 variables: ["obj"], // defect 10
-                properties: ["obj.a="],
+                properties: ["obj.a="], // ticket 12: without the flag, object-literal keys of a bare assignment should be reads
             },
             {
                 description: "obj = {a: b}",
                 input: "obj = {a: b}",
                 isProgram: true,
                 variables: ["obj", "b"],
-                properties: ["obj.a="],
+                properties: ["obj.a="], // ticket 12: without the flag, object-literal keys of a bare assignment should be reads
             },
             {
                 description: "obj = {'k': 1} // defect 6: string key dropped",
@@ -1473,7 +1492,7 @@ describe("JS Parser", () => {
                 input: "obj = {get a(){return 1}}",
                 isProgram: true,
                 variables: ["obj"],
-                properties: ["obj.a="],
+                properties: ["obj.a="], // ticket 12: without the flag, object-literal keys of a bare assignment should be reads
             },
 
             // --- Binding forms ---
@@ -1668,7 +1687,7 @@ describe("JS Parser", () => {
                 input: "a.b += 1",
                 isProgram: true,
                 variables: ["a"],
-                properties: ["a.b="],
+                properties: ["a.b="], // ticket 12: without the flag, a property assignment should be a read
             },
             {
                 description: "a.b += 1, assignmentIsDefinition",
@@ -1816,8 +1835,7 @@ describe("JS Parser", () => {
                 properties: [],
             },
             {
-                description:
-                    "RegExp.test(a)",
+                description: "RegExp.test(a)",
                 input: "RegExp.test(a)",
                 isProgram: true,
                 variables: ["a"],
@@ -1849,14 +1867,14 @@ describe("JS Parser", () => {
                 input: "State.variables.foo = 1",
                 isProgram: true,
                 variables: ["State"],
-                properties: ["State.variables=", "State.variables.foo="],
+                properties: ["State.variables=", "State.variables.foo="], // ticket 12: only `State.variables.foo` is a write, and only with the flag
             },
             {
                 description: "setup.x = 1",
                 input: "setup.x = 1",
                 isProgram: true,
                 variables: ["setup"],
-                properties: ["setup.x="],
+                properties: ["setup.x="], // ticket 12: without the flag, a property assignment should be a read
             },
 
             // --- Broken input (loose parse) ---
