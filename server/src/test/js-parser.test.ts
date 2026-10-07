@@ -1623,6 +1623,118 @@ describe("JS Parser", () => {
                 properties: [],
             },
             {
+                description:
+                    "(function(){ on('x', handler); function handler(){} })() // ticket 13: a function declaration is hoisted, so an earlier reference binds to it",
+                input: "(function(){ on('x', handler); function handler(){} })()",
+                isProgram: true,
+                variables: [],
+                properties: [],
+            },
+            {
+                description:
+                    "(function(){ init(); function init(){} })() // ticket 13: a hoisted function called before its declaration binds too (matters once ticket 07 indexes callees)",
+                input: "(function(){ init(); function init(){} })()",
+                isProgram: true,
+                variables: [],
+                properties: [],
+            },
+            {
+                description:
+                    "(function(){ const cb = () => count; let count = 0; })() // ticket 13: a closure over a later `let` binds to it",
+                input: "(function(){ const cb = () => count; let count = 0; })()",
+                isProgram: true,
+                variables: [],
+                properties: [],
+            },
+            {
+                description:
+                    "function f(){ if (x) { function g(){} } return g } // ticket 13: a function declared in a block binds only in that block (no sloppy-mode Annex B hoisting)",
+                input: "function f(){ if (x) { function g(){} } return g }",
+                isProgram: true,
+                variables: ["x", "g"],
+                properties: [],
+            },
+            {
+                description:
+                    "function f(){ return arguments } // ticket 13: `arguments` is bound implicitly in a function",
+                input: "function f(){ return arguments }",
+                isProgram: true,
+                variables: [],
+                properties: [],
+            },
+            {
+                description:
+                    "function f(){ return () => arguments } // ticket 13: an arrow sees its enclosing function's `arguments`",
+                input: "function f(){ return () => arguments }",
+                isProgram: true,
+                variables: [],
+                properties: [],
+            },
+            {
+                description:
+                    "arguments // ticket 13: at the top level `arguments` is unbound, so it's a story variable",
+                input: "arguments",
+                isProgram: true,
+                variables: ["arguments"],
+                properties: [],
+            },
+            {
+                description:
+                    "class A { static { let z = 1; var w = 2; z; w } } // ticket 13: a static block is its own function-like scope; neither `let` nor `var` leaks",
+                input: "class A { static { let z = 1; var w = 2; z; w } }",
+                isProgram: true,
+                variables: ["A="],
+                properties: [],
+            },
+            {
+                description:
+                    "switch (k) { case 1: let y = 2; y } // ticket 13: `switch` cases share one block scope",
+                input: "switch (k) { case 1: let y = 2; y }",
+                isProgram: true,
+                variables: ["k"],
+                properties: [],
+            },
+            {
+                description:
+                    "const f = function named(){ let x = named; } // ticket 13: a named function expression's name binds inside it",
+                input: "const f = function named(){ let x = named; }",
+                isProgram: true,
+                variables: ["f="],
+                properties: [],
+            },
+            {
+                description:
+                    "const f = function named(named){ return named } // ticket 13: a param shadows a named function expression's name",
+                input: "const f = function named(named){ return named }",
+                isProgram: true,
+                variables: ["f="],
+                properties: [],
+            },
+            {
+                description:
+                    "with (obj) { y } // ticket 13: `y` might be `obj.y`; there's no way to know, so it stays a story variable",
+                input: "with (obj) { y }",
+                isProgram: true,
+                variables: ["obj", "y"],
+                properties: [],
+            },
+            {
+                description:
+                    "function f(a = b){ var b } // ticket 13: params don't see body `var`s",
+                input: "function f(a = b){ var b }",
+                isProgram: true,
+                variables: [], // ticket 09: should be ["b"] once param defaults are visited
+                properties: [],
+            },
+            {
+                description:
+                    "x; let x = 1 // ticket 13: hoisting doesn't change the top level, where every name is global",
+                input: "x; let x = 1",
+                isProgram: true,
+                variables: ["x", "x="],
+                properties: [],
+            },
+            {
                 description: "a = () => { b = 1 }",
                 input: "a = () => { b = 1 }",
                 isProgram: true,
