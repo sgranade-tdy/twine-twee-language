@@ -36,6 +36,7 @@ import {
     versionCompare,
 } from "../../utilities";
 import { StoryFormatParsingState, capturePreSemanticTokenFor } from "..";
+import { browserGlobals } from "../host-globals";
 import { ChapbookParserAPI } from ".";
 import { InsertTokens, ModifierTokens } from "./inserts";
 import {
@@ -81,6 +82,14 @@ export interface ChapbookParsingState extends StoryFormatParsingState {
 }
 
 const varInsertRegex = /^({\s*)(\S+)\s*}$/;
+
+/**
+ * Host globals that are never Chapbook story variables. Chapbook variables are
+ * bare names, so collision-prone browser globals like `location` and `history`
+ * are deliberately left out: an author who picks one of those names means a
+ * story variable. Chapbook doesn't ship jQuery, so `$` isn't special.
+ */
+const chapbookHostGlobals: ReadonlySet<string> = browserGlobals;
 
 /**
  * Get Chapbook-specific symbol definitions across all indexed documents.
@@ -2320,6 +2329,7 @@ export function parsePassageText(
     const chapbookState: ChapbookParsingState = {
         modifierKind: ModifierKind.None,
         passageTokens: {},
+        hostGlobals: chapbookHostGlobals,
         api: api,
     };
 

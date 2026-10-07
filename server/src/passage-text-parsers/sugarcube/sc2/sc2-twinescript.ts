@@ -9,6 +9,23 @@ import {
 } from "../../../js-parser";
 import { createLocationFor } from "../../../parser";
 import { capturePreSemanticTokenFor, StoryFormatParsingState } from "../..";
+import {
+    browserGlobals,
+    collisionProneBrowserGlobals,
+    jQueryGlobals,
+} from "../../host-globals";
+
+/**
+ * Host globals that are never SugarCube story variables. Story and temporary
+ * variables are sigiled (`$x`, `_x`) and desugared to `Xx` before JavaScript
+ * parsing, so no bare host name can collide with one, and a bare `$` that
+ * survives desugaring is always jQuery.
+ */
+export const sugarCubeHostGlobals: ReadonlySet<string> = new Set([
+    ...browserGlobals,
+    ...collisionProneBrowserGlobals,
+    ...jQueryGlobals,
+]);
 
 /**
  * Whether a bit of text starts with a variable sigil ($, _) or
@@ -191,20 +208,24 @@ export function isTwineScriptExpression(expression: string): boolean {
         const ast = parseJSStrict(desugared, false);
         // Make sure all variables are SugarCube variables, as barewords will look like
         // variables to the JS parser
-        return isEveryIdentifierAVariable(ast, (name, at) => {
-            // Resugar the text (if needed) and test to see if it's an SC2 variable.
-            const { sugaredText } = getSugaredPositionAndNewText(
-                at,
-                positionMapping,
-            );
-            let text = name;
-            if (sugaredText === "$" || sugaredText === "_") {
-                text = sugaredText + name.slice(1);
-            } else if (sugaredText !== undefined) {
-                text = sugaredText;
-            }
-            return startIsVarRegexp.test(text);
-        });
+        return isEveryIdentifierAVariable(
+            ast,
+            (name, at) => {
+                // Resugar the text (if needed) and test to see if it's an SC2 variable.
+                const { sugaredText } = getSugaredPositionAndNewText(
+                    at,
+                    positionMapping,
+                );
+                let text = name;
+                if (sugaredText === "$" || sugaredText === "_") {
+                    text = sugaredText + name.slice(1);
+                } else if (sugaredText !== undefined) {
+                    text = sugaredText;
+                }
+                return startIsVarRegexp.test(text);
+            },
+            sugarCubeHostGlobals,
+        );
     } catch {
         return false;
     }
@@ -241,6 +262,7 @@ export function tokenizeTwineScriptExpression(
     // a temporary story format parsing state.
     const desugaredStoryFormatState: StoryFormatParsingState = {
         passageTokens: {},
+        hostGlobals: storyFormatState.hostGlobals,
     };
     // We'll also create a fake document that contains just the expression
     const desugaredDocument = TextDocument.create(

@@ -97,20 +97,46 @@ export interface TokenizedJS {
 // The marker `acorn-loose` uses for a missing identifier.
 const MISSING_IDENTIFIER = "✖";
 
-const builtInObjects = new Set([
+/**
+ * JavaScript's own global names, which are never story variables. Browser and
+ * library globals aren't JavaScript; story formats supply those as
+ * `StoryFormatParsingState.hostGlobals`.
+ */
+const ecmaScriptGlobals: ReadonlySet<string> = new Set([
     // Taken from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
     "Object",
     "Function",
     "Boolean",
     "Symbol",
     "Error",
+    "AggregateError",
+    "EvalError",
+    "RangeError",
+    "ReferenceError",
+    "SuppressedError",
+    "SyntaxError",
+    "TypeError",
+    "URIError",
     "Number",
     "BigInt",
     "Math",
     "Date",
     "Temporal",
     "String",
+    "RegExp",
     "Array",
+    "Int8Array",
+    "Uint8Array",
+    "Uint8ClampedArray",
+    "Int16Array",
+    "Uint16Array",
+    "Int32Array",
+    "Uint32Array",
+    "BigInt64Array",
+    "BigUint64Array",
+    "Float16Array",
+    "Float32Array",
+    "Float64Array",
     "Map",
     "Set",
     "WeakMap",
@@ -132,17 +158,16 @@ const builtInObjects = new Set([
     "AsyncFunction",
     "DisposableStack",
     "AsyncDisposableStack",
-    "RegExp",
     "Reflect",
     "Proxy",
     "Intl",
-    // These next are actually keywords
+    // Value properties. (`null` is a keyword that parses as a `Literal`, so it
+    // never reaches a name check and isn't listed.)
     "undefined",
-    "null",
     "NaN",
     "Infinity",
     "globalThis",
-    // Global functions
+    // Function properties
     "parseInt",
     "parseFloat",
     "isNaN",
@@ -151,25 +176,9 @@ const builtInObjects = new Set([
     "encodeURIComponent",
     "decodeURI",
     "decodeURIComponent",
+    "escape",
+    "unescape",
     "eval",
-    "setTimeout",
-    "setInterval",
-    "clearTimeout",
-    "clearInterval",
-    // Commonly-referred-to API objects
-    "console",
-    "document",
-    "window",
-    "alert",
-    "prompt",
-    "confirm",
-    "localStorage",
-    "sessionStorage",
-    "navigator",
-    "history",
-    "location",
-    "$",
-    "jQuery",
 ]);
 
 // This is hacky, but we're going to ignore root properties whose names
@@ -774,13 +783,33 @@ function isDynamicChain(chain: MemberChain): boolean {
 }
 
 /**
- * Does a property's scope correspond to a built-in JS object?
+ * Predicate for names that are globals (JavaScript's own, or the host globals
+ * a story format supplies) and so are never story variables.
+ */
+type IsGlobalName = (name: string) => boolean;
+
+/**
+ * Build the global-name predicate for one parse.
+ *
+ * @param hostGlobals Host globals supplied by the story format, if any.
+ * @returns Predicate that's true for JavaScript and host globals.
+ */
+function globalNamePredicate(hostGlobals?: ReadonlySet<string>): IsGlobalName {
+    return (name) => ecmaScriptGlobals.has(name) || !!hostGlobals?.has(name);
+}
+
+/**
+ * Does a property's scope correspond to a global object?
  *
  * @param scope Scope to inspect.
- * @returns True if the scope is for a built-in JS object.
+ * @param isGlobalName Global-name predicate for this parse.
+ * @returns True if the scope is rooted in a global object.
  */
-function isBuiltinObjectScope(scope: string): boolean {
-    return builtInObjects.has(scope.split(".", 1)[0]);
+function isGlobalObjectScope(
+    scope: string,
+    isGlobalName: IsGlobalName,
+): boolean {
+    return isGlobalName(scope.split(".", 1)[0]);
 }
 
 /**
@@ -895,8 +924,9 @@ function captureObjectExpressionProperties(
         scope?: string,
         defined?: boolean,
     ) => void,
+    isGlobalName: IsGlobalName,
 ) {
-    const isBuiltinObject = isBuiltinObjectScope(parentScope);
+    const isGlobalObject = isGlobalObjectScope(parentScope, isGlobalName);
 
     for (const prop of node.properties) {
         if (prop.type !== "Property") continue; // We only care about properties
@@ -907,12 +937,12 @@ function captureObjectExpressionProperties(
         );
         if (!propName) continue;
 
-        // Capture the property. Note we blank out the scope for built-in objects
+        // Capture the property. Note we blank out the scope for globals
         // so their properties aren't tracked
         capturePropertyCallback(
             propName,
             prop.key.start,
-            isBuiltinObject ? undefined : parentScope,
+            isGlobalObject ? undefined : parentScope,
             true,
         );
 
@@ -927,6 +957,7 @@ function captureObjectExpressionProperties(
                 prop.value,
                 newScope,
                 capturePropertyCallback,
+                isGlobalName,
             );
         }
     }
@@ -1012,13 +1043,17 @@ function isExcludedIdentifier(
  * Is the name potentially a variable we want to track?
  *
  * We don't track empty names, missing identifiers from loose
- * parsing, or built-in JS objects.
+ * parsing, or globals.
  *
  * @param name Identifier name.
+ * @param isGlobalName Global-name predicate for this parse.
  * @returns True if the name could be a variable to be tracked.
  */
-function isPotentialTrackedVariableName(name: string): boolean {
-    return !!name && name !== MISSING_IDENTIFIER && !builtInObjects.has(name);
+function isPotentialTrackedVariableName(
+    name: string,
+    isGlobalName: IsGlobalName,
+): boolean {
+    return !!name && name !== MISSING_IDENTIFIER && !isGlobalName(name);
 }
 
 /**
@@ -1031,16 +1066,18 @@ function isPotentialTrackedVariableName(name: string): boolean {
  *
  * @param node Identifier to test.
  * @param ancestors Node's ancestors, ending with `node` itself.
+ * @param isGlobalName Global-name predicate for this parse.
  * @returns True if the identifier is a candidate variable occurrence.
  */
 function isCandidateVariable(
     node: acorn.Identifier,
     ancestors: acorn.Node[],
+    isGlobalName: IsGlobalName,
 ): boolean {
     const role = classifyIdentifier(node, ancestors);
     if (role === "neither") return false;
     if (isExcludedIdentifier(role, parentOf(ancestors), node)) return false;
-    return isPotentialTrackedVariableName(node.name);
+    return isPotentialTrackedVariableName(node.name, isGlobalName);
 }
 
 /**
@@ -1062,11 +1099,13 @@ interface PreSemanticToken {
  *
  * @param text Original unparsed text.
  * @param ast Parsed text.
+ * @param isGlobalName Global-name predicate for this parse.
  * @returns Object whose keys are the token's location in the unparsed text and whose values are semantic tokens.
  */
 function computeSemanticTokens(
     text: string,
     ast: acorn.Node,
+    isGlobalName: IsGlobalName,
 ): Record<number, PreSemanticToken> {
     const tokens: Record<number, PreSemanticToken> = {};
 
@@ -1079,9 +1118,9 @@ function computeSemanticTokens(
         tokens[start] = { text: tokenText, at: start, type, modifiers: [] };
     };
 
-    // Helper function to add a variable token if it's not a built-in JS object
+    // Helper function to add a variable token if it's not a global
     const captureVariable = (id: ScopedIdentifier) => {
-        if (!isPotentialTrackedVariableName(id.name)) return;
+        if (!isPotentialTrackedVariableName(id.name, isGlobalName)) return;
         addToken(id.start, id.name, ETokenType.variable);
     };
 
@@ -1095,7 +1134,7 @@ function computeSemanticTokens(
         const node = rawNode as acorn.AnyNode;
         switch (node.type) {
             case "Identifier": {
-                if (isCandidateVariable(node, ancestors)) {
+                if (isCandidateVariable(node, ancestors, isGlobalName)) {
                     captureVariable(node as ScopedIdentifier);
                 }
                 break;
@@ -1219,7 +1258,10 @@ interface RawPropertyOccurrence {
  * @param ast Parsed text, already annotated by `annotateVariableScopes`.
  * @returns Variable and property occurrences, in ascending order of position.
  */
-function extractSymbols(ast: acorn.Node): {
+function extractSymbols(
+    ast: acorn.Node,
+    isGlobalName: IsGlobalName,
+): {
     variables: RawVariableOccurrence[];
     properties: RawPropertyOccurrence[];
 } {
@@ -1229,9 +1271,9 @@ function extractSymbols(ast: acorn.Node): {
     const variableTokens: Record<number, RawVariableOccurrence> = {};
     const propertyTokens: Record<number, RawPropertyOccurrence> = {};
 
-    // Helper function to add a variable occurrence if it's an unbound (story) variable and not a built-in JS object
+    // Helper function to add a variable occurrence if it's an unbound (story) variable and not a global
     const captureVariable = (id: ScopedIdentifier) => {
-        if (!isPotentialTrackedVariableName(id.name)) return;
+        if (!isPotentialTrackedVariableName(id.name, isGlobalName)) return;
         if (id._scopeType !== "global") return;
         variableTokens[id.start] = {
             text: id.name,
@@ -1248,7 +1290,7 @@ function extractSymbols(ast: acorn.Node): {
         defined = false,
     ) => {
         if (!name) return;
-        // Properties without a scope (e.g. built-in objects') aren't tracked.
+        // Properties without a scope (e.g. globals') aren't tracked.
         if (scope === undefined) return;
         propertyTokens[start] = {
             text: name,
@@ -1262,7 +1304,7 @@ function extractSymbols(ast: acorn.Node): {
         const node = rawNode as acorn.AnyNode;
         switch (node.type) {
             case "Identifier": {
-                if (isCandidateVariable(node, ancestors)) {
+                if (isCandidateVariable(node, ancestors, isGlobalName)) {
                     captureVariable(node as ScopedIdentifier);
                 }
                 break;
@@ -1278,7 +1320,7 @@ function extractSymbols(ast: acorn.Node): {
                 }
 
                 const defined = isMemberExpressionDefinition(node, ancestors);
-                const isBuiltin = isBuiltinObjectScope(chain.root.name);
+                const isGlobal = isGlobalName(chain.root.name);
 
                 // Add the root variable
                 captureVariable(chain.root);
@@ -1304,7 +1346,7 @@ function extractSymbols(ast: acorn.Node): {
 
                     // Scope is valid only until the first dynamic property
                     const scope =
-                        !dynamicEncountered && !isBuiltin
+                        !dynamicEncountered && !isGlobal
                             ? [
                                   chain.root.name,
                                   ...chain.properties
@@ -1355,6 +1397,7 @@ function extractSymbols(ast: acorn.Node): {
                                     ancestor.right,
                                     parentScope,
                                     captureProperty,
+                                    isGlobalName,
                                 );
                             }
                             break;
@@ -1374,6 +1417,7 @@ function extractSymbols(ast: acorn.Node): {
                                     ancestor.right,
                                     parentScope,
                                     captureProperty,
+                                    isGlobalName,
                                 );
                                 break;
                             }
@@ -1394,6 +1438,7 @@ function extractSymbols(ast: acorn.Node): {
                                 ancestor.init,
                                 parentScope,
                                 captureProperty,
+                                isGlobalName,
                             );
                         }
                         break;
@@ -1405,7 +1450,7 @@ function extractSymbols(ast: acorn.Node): {
                 captureProperty(
                     propName,
                     node.key.start,
-                    isBuiltinObjectScope(parentScope || "")
+                    isGlobalObjectScope(parentScope || "", isGlobalName)
                         ? undefined
                         : parentScope || undefined,
                     true,
@@ -1427,7 +1472,7 @@ function extractSymbols(ast: acorn.Node): {
  *
  * This walks the AST once and asks the predicate about every identifier that
  * reads or writes a name, skipping property keys, labels, import bindings,
- * built-in JS objects, a function declaration's/expression's own name and
+ * globals, a function declaration's/expression's own name and
  * parameters, and call/`new` callees. Callees are skipped because they name
  * story-format or JS functions (`either(...)`, `visited(...)`), not variables.
  *
@@ -1438,13 +1483,16 @@ function extractSymbols(ast: acorn.Node): {
  *
  * @param ast Parsed AST to walk.
  * @param isVariable Predicate called with each candidate identifier's name and start position.
+ * @param hostGlobals Host globals supplied by the story format, if any.
  * @returns True if every candidate identifier satisfies the predicate.
  */
 export function isEveryIdentifierAVariable(
     ast: acorn.Node,
     isVariable: (name: string, start: number) => boolean,
+    hostGlobals?: ReadonlySet<string>,
 ): boolean {
     let allValid = true;
+    const isGlobalName = globalNamePredicate(hostGlobals);
 
     acornWalk.fullAncestor(ast, (rawNode, _, ancestors) => {
         const node = rawNode as acorn.AnyNode;
@@ -1454,7 +1502,7 @@ export function isEveryIdentifierAVariable(
         const parent = parentOf(ancestors);
         if (isCallee(node, parent) || isFunctionOwnBinding(role, parent))
             return;
-        if (!isPotentialTrackedVariableName(node.name)) return;
+        if (!isPotentialTrackedVariableName(node.name, isGlobalName)) return;
 
         if (!isVariable(node.name, node.start)) allValid = false;
     });
@@ -1552,7 +1600,7 @@ export function parseJS(
  * @param text Text to parse.
  * @param offset Offset into the document where the expression occurs.
  * @param document Document containing the expression.
- * @param storyFormatState Story format parsing state that will collect semantic tokens.
+ * @param storyFormatState Story format parsing state that will collect semantic tokens, and that supplies the format's host globals.
  * @param assignmentIsDefinition If true, variable assignment will be treated as variable definition. (Needed for e.g. SugarCube passage link setters.)
  * @returns Tokenized variables and properties and any parsing error.
  */
@@ -1573,9 +1621,10 @@ export function tokenizeJavaScript(
     tokenized.error = diagnostic;
     if (ast !== undefined) {
         annotateVariableScopes(ast, !!assignmentIsDefinition);
+        const isGlobalName = globalNamePredicate(storyFormatState.hostGlobals);
 
         // Highlighting pass: every token, no scope.
-        const semanticTokens = computeSemanticTokens(text, ast);
+        const semanticTokens = computeSemanticTokens(text, ast, isGlobalName);
         for (const token of Object.values(semanticTokens)) {
             capturePreSemanticTokenFor(
                 token.text,
@@ -1587,7 +1636,7 @@ export function tokenizeJavaScript(
         }
 
         // Extraction pass: scope-resolved variables and properties, no operators/literals/keywords.
-        const { variables, properties } = extractSymbols(ast);
+        const { variables, properties } = extractSymbols(ast, isGlobalName);
         for (const variable of variables) {
             tokenized.variables.push({
                 contents: variable.text,

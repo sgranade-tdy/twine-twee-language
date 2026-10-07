@@ -194,6 +194,12 @@ export interface StoryFormatParsingState {
      * Information for semantic tokens generated in a text subsection.
      */
     passageTokens: Record<number, PreSemanticToken>;
+    /**
+     * Host (browser, library) globals that are never story variables in this
+     * story format. JavaScript's own globals are always excluded; see
+     * `host-globals.ts`.
+     */
+    hostGlobals?: ReadonlySet<string>;
 }
 
 /**

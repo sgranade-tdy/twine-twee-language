@@ -5,6 +5,8 @@ import { Location, Range } from "vscode-languageserver";
 import { buildParsingState, MockCallbacks } from "./builders";
 import { ETokenType } from "../semantic-tokens";
 import { StoryFormatParsingState } from "../passage-text-parsers";
+import { browserGlobals } from "../passage-text-parsers/host-globals";
+import { sugarCubeHostGlobals } from "../passage-text-parsers/sugarcube/sc2/sc2-twinescript";
 import * as uut from "../js-parser";
 
 describe("JS Parser", () => {
@@ -1320,12 +1322,16 @@ describe("JS Parser", () => {
          * fixed, so the diff shows the behaviour change. Rows tagged
          * `// ticket N` are wrong by the spec's rules but not in that table;
          * ticket N is expected to change them.
+         *
+         * Rows run with no host globals (JavaScript's own globals only) unless
+         * they set `hostGlobals`, which stands in for a story format's list.
          */
         interface TestCase {
             description: string;
             input: string;
             isProgram: boolean;
             assignmentIsDefinition?: boolean;
+            hostGlobals?: ReadonlySet<string>;
             variables: string[];
             properties: string[];
             error?: string;
@@ -1937,6 +1943,7 @@ describe("JS Parser", () => {
                     "setTimeout(fn, 1) // defect 1, fixed by ticket 02: same as foo(bar)",
                 input: "setTimeout(fn, 1)",
                 isProgram: true,
+                hostGlobals: browserGlobals,
                 variables: ["fn"],
                 properties: [],
             },
@@ -1952,6 +1959,7 @@ describe("JS Parser", () => {
                 description: "$('#x').hide()",
                 input: "$('#x').hide()",
                 isProgram: true,
+                hostGlobals: sugarCubeHostGlobals,
                 variables: [],
                 properties: [],
             },
@@ -1970,6 +1978,7 @@ describe("JS Parser", () => {
                     "console.log(a) // defect 1, fixed by ticket 02: same as foo(bar)",
                 input: "console.log(a)",
                 isProgram: true,
+                hostGlobals: browserGlobals,
                 variables: ["a"],
                 properties: [],
             },
@@ -1977,7 +1986,63 @@ describe("JS Parser", () => {
                 description: "window.foo = 1",
                 input: "window.foo = 1",
                 isProgram: true,
+                hostGlobals: browserGlobals,
                 variables: [],
+                properties: [],
+            },
+            {
+                description:
+                    "window.foo = 1 with no host globals: `window` isn't JavaScript's",
+                input: "window.foo = 1",
+                isProgram: true,
+                variables: ["window"],
+                properties: ["window.foo="],
+            },
+            {
+                description:
+                    "location.x = history // Chapbook: collision-prone names are story variables",
+                input: "location.x = history",
+                isProgram: true,
+                hostGlobals: browserGlobals,
+                variables: ["location", "history"],
+                properties: ["location.x="],
+            },
+            {
+                description:
+                    "location.x = history // SugarCube: no bare name is a story variable",
+                input: "location.x = history",
+                isProgram: true,
+                hostGlobals: sugarCubeHostGlobals,
+                variables: [],
+                properties: [],
+            },
+            {
+                description: "jQuery.fx.off = a",
+                input: "jQuery.fx.off = a",
+                isProgram: true,
+                hostGlobals: sugarCubeHostGlobals,
+                variables: ["a"],
+                properties: [],
+            },
+            {
+                description: "new TypeError(m)",
+                input: "new TypeError(m)",
+                isProgram: true,
+                variables: ["m"],
+                properties: [],
+            },
+            {
+                description: "Uint8Array.from(a)",
+                input: "Uint8Array.from(a)",
+                isProgram: true,
+                variables: ["a"],
+                properties: [],
+            },
+            {
+                description: "[undefined, NaN, Infinity, x]",
+                input: "[undefined, NaN, Infinity, x]",
+                isProgram: false,
+                variables: ["x"],
                 properties: [],
             },
             {
@@ -2104,6 +2169,7 @@ describe("JS Parser", () => {
             input,
             isProgram,
             assignmentIsDefinition,
+            hostGlobals,
             variables,
             properties,
             error,
@@ -2116,6 +2182,7 @@ describe("JS Parser", () => {
                 });
                 const storyState: StoryFormatParsingState = {
                     passageTokens: {},
+                    hostGlobals,
                 };
 
                 const result = uut.tokenizeJavaScript(
