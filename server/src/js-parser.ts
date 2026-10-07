@@ -656,9 +656,24 @@ function annotateVariableScopes(
  */
 type MemberChain = {
     root: ScopedIdentifier;
-    properties: { name: string; start: number }[];
-    dynamic: boolean; // true if the chain includes any non-static computed property
+    properties: MemberSegment[];
 };
+
+/**
+ * One property segment of a member chain. `name` is undefined for a computed,
+ * non-static segment (`obj[k]`), which has no name to track or highlight.
+ */
+type MemberSegment = { name: string | undefined; start: number };
+
+/**
+ * Does a member chain include any computed, non-static segment?
+ *
+ * @param chain Chain to inspect.
+ * @returns True if any segment has no static name.
+ */
+function isDynamicChain(chain: MemberChain): boolean {
+    return chain.properties.some((p) => p.name === undefined);
+}
 
 /**
  * Does a property's scope correspond to a built-in JS object?
@@ -733,10 +748,9 @@ function isMemberExpressionDefinition(
 function captureMemberChain(
     node: acorn.MemberExpression,
 ): MemberChain | undefined {
-    const props: { name: string; start: number }[] = [];
+    const props: MemberSegment[] = [];
     let current: acorn.Expression | acorn.Super = node;
     let root: ScopedIdentifier | undefined;
-    let dynamic = false;
 
     while (true) {
         if (current.type === "MemberExpression") {
@@ -745,7 +759,6 @@ function captureMemberChain(
                 current.property,
                 current.computed,
             );
-            if (!propName) dynamic = true;
             const start =
                 current.computed &&
                 current.property.type === "Literal" &&
@@ -753,7 +766,7 @@ function captureMemberChain(
                     ? current.property.start + 1
                     : current.property.start;
 
-            props.unshift({ name: propName ?? "<dynamic>", start });
+            props.unshift({ name: propName, start });
             current = current.object; // Head up the chain in the expression
         } else if (current.type === "Identifier") {
             // This is the variable at the root
@@ -765,7 +778,7 @@ function captureMemberChain(
     }
 
     if (!root) return undefined;
-    return { root: root, properties: props, dynamic };
+    return { root: root, properties: props };
 }
 
 /**
@@ -797,7 +810,7 @@ function captureObjectExpressionProperties(
         if (!propName) continue;
 
         // Capture the property. Note we blank out the scope for built-in objects
-        // so their properties get semantic tokens but aren't otherwise tracked
+        // so their properties aren't tracked
         capturePropertyCallback(
             propName,
             prop.key.start,
@@ -822,23 +835,65 @@ function captureObjectExpressionProperties(
 }
 
 /**
- * Is an identifier excluded because of its immediate parent: a call/`new`
- * callee, a shorthand property's value, or a function's own name or
- * parameter?
+ * Is a node the callee of a call or `new` expression (`foo` in `foo(bar)`,
+ * `obj.method` in `obj.method(x)`, `Foo` in `new Foo(bar)`)?
  *
- * A call or `new` expression's callee (`foo` in `foo(bar)`, `Foo` in
- * `new Foo(bar)`) isn't a story-variable occurrence yet -- it's a
- * function/constructor reference, which is issue 07's business. Their
- * arguments, though, are ordinary reads. Nor are a function declaration's or
- * function expression's own name and parameters occurrences (issue 06 is what
- * starts treating declarations as story-variable writes). Arrow-function
- * parameters aren't excluded here: they never resolve to a story variable
- * because they're never scope-annotated, but they're still highlighted as
- * variables. Nor -- pre-existing defect 10, out of scope here -- is a
- * shorthand object-literal property's value (e.g. `a` in `{a}`): its position
- * collides with its own key, so it's always reported as the property, never as
- * the variable read it also is. Everything else -- references, plus
- * `var`/`let`/`const` and `catch` declarations -- is a real occurrence today.
+ * This is the one place every pass asks that question, so calls and
+ * constructions are always treated alike.
+ *
+ * @param node Node to test.
+ * @param parent The node's immediate parent, if any.
+ * @returns True if the node is a call or `new` callee.
+ */
+function isCallee(
+    node: acorn.AnyNode,
+    parent: acorn.AnyNode | undefined,
+): boolean {
+    return (
+        (parent?.type === "CallExpression" ||
+            parent?.type === "NewExpression") &&
+        parent.callee === node
+    );
+}
+
+/**
+ * Is an identifier a function declaration's or function expression's own
+ * name or parameter?
+ *
+ * @param role The identifier's classified role.
+ * @param parent The identifier's immediate parent, if any.
+ * @returns True if the identifier is a function's own name or parameter.
+ */
+function isFunctionOwnBinding(
+    role: IdentifierRole,
+    parent: acorn.AnyNode | undefined,
+): boolean {
+    return (
+        role === "declaration" &&
+        (parent?.type === "FunctionDeclaration" ||
+            parent?.type === "FunctionExpression")
+    );
+}
+
+/**
+ * Is an identifier excluded from highlighting and extraction because of its
+ * immediate parent: a call/`new` callee, a shorthand property's value, or a
+ * function's own name or parameter?
+ *
+ * A callee isn't a story-variable occurrence yet -- it's a function/constructor
+ * reference, which is issue 07's business. Its arguments, though, are ordinary
+ * reads. Nor are a function declaration's or function expression's own name
+ * and parameters occurrences (issue 06 is what starts treating declarations as
+ * story-variable writes). Arrow-function parameters aren't excluded here: they
+ * never resolve to a story variable because they're never scope-annotated, but
+ * they're still highlighted as variables. Nor -- pre-existing defect 10, out of
+ * scope here -- is a shorthand object-literal property's value (e.g. `a` in
+ * `{a}`): it's always reported as the property, never as the variable read it
+ * also is. Everything else -- references, plus `var`/`let`/`const` and `catch`
+ * declarations -- is a real occurrence today.
+ *
+ * Callee and shorthand exclusions are temporary (issue 07 removes them), so
+ * `isEveryIdentifierAVariable` deliberately doesn't use this.
  *
  * @param role The identifier's classified role.
  * @param parent The identifier's immediate parent node, if any.
@@ -850,18 +905,9 @@ function isExcludedIdentifier(
     parent: acorn.AnyNode | undefined,
     node: acorn.AnyNode,
 ): boolean {
-    if (
-        (parent?.type === "CallExpression" ||
-            parent?.type === "NewExpression") &&
-        parent.callee === node
-    )
-        return true;
+    if (isCallee(node, parent)) return true;
     if (parent?.type === "Property" && parent.shorthand) return true;
-    return (
-        role === "declaration" &&
-        (parent?.type === "FunctionDeclaration" ||
-            parent?.type === "FunctionExpression")
-    );
+    return isFunctionOwnBinding(role, parent);
 }
 
 /**
@@ -883,7 +929,7 @@ function isPotentialTrackedVariableName(name: string): boolean {
  * as a story variable?
  *
  * This is the one place every pass asks that question, combining
- * `classifyIdentifier`, `isExcludedIdentifier`, and `isTrackableVariableName`.
+ * `classifyIdentifier`, `isExcludedIdentifier`, and `isPotentialTrackedVariableName`.
  *
  * @param node Identifier to test.
  * @param ancestors Node's ancestors, ending with `node` itself.
@@ -942,8 +988,8 @@ function computeSemanticTokens(
     };
 
     // Helper function to add a property token if it's not dynamic
-    const captureProperty = (name: string, start: number) => {
-        if (!name || name === "<dynamic>") return;
+    const captureProperty = (name: string | undefined, start: number) => {
+        if (!name) return;
         addToken(start, name, ETokenType.property);
     };
 
@@ -975,7 +1021,8 @@ function computeSemanticTokens(
                 break;
             }
 
-            case "CallExpression": {
+            case "CallExpression":
+            case "NewExpression": {
                 if (node.callee.type === "Identifier") {
                     addToken(
                         node.callee.start,
@@ -987,7 +1034,7 @@ function computeSemanticTokens(
                     const lastProp = chain?.properties.at(-1);
                     // A non-static callee (`obj[k](x)`) has no name to mark
                     // as a function; `k` keeps its own variable token.
-                    if (lastProp && lastProp.name !== "<dynamic>") {
+                    if (lastProp && lastProp.name !== undefined) {
                         addToken(
                             lastProp.start,
                             lastProp.name,
@@ -1097,14 +1144,13 @@ function extractSymbols(ast: acorn.Node): {
 
     // Helper function to add a property occurrence if it's not dynamic and has a known scope
     const captureProperty = (
-        name: string,
+        name: string | undefined,
         start: number,
         scope?: string,
         defined = false,
     ) => {
-        if (!name || name === "<dynamic>") return;
-        // Properties without a scope (e.g. built-in objects') get semantic
-        // tokens but aren't otherwise tracked.
+        if (!name) return;
+        // Properties without a scope (e.g. built-in objects') aren't tracked.
         if (scope === undefined) return;
         propertyTokens[start] = {
             text: name,
@@ -1139,23 +1185,22 @@ function extractSymbols(ast: acorn.Node): {
                 // Add the root variable
                 captureVariable(chain.root);
 
-                // If this member expression is itself a call's callee (e.g.
-                // `obj.method` in `obj.method(x)`), its last segment is a
-                // function reference, not a property occurrence -- that's
-                // issue 07's business, same as a plain call's callee.
-                const parent = parentOf(ancestors);
-                const lastIsCallCallee =
-                    parent?.type === "CallExpression" && parent.callee === node;
+                // If this member expression is itself a call or `new` callee
+                // (e.g. `obj.method` in `obj.method(x)`, `obj.Foo` in
+                // `new obj.Foo(x)`), its last segment is a function reference,
+                // not a property occurrence -- that's issue 07's business,
+                // same as a plain callee.
+                const lastIsCallee = isCallee(node, parentOf(ancestors));
 
                 // Track dynamic properties incrementally
                 let dynamicEncountered = false;
 
                 chain.properties.forEach((prop, i) => {
-                    if (prop.name === "<dynamic>") {
+                    if (prop.name === undefined) {
                         dynamicEncountered = true;
                         return; // Skip capturing dynamic property itself
                     }
-                    if (lastIsCallCallee && i === chain.properties.length - 1) {
+                    if (lastIsCallee && i === chain.properties.length - 1) {
                         return; // Skip the callee's own name
                     }
 
@@ -1219,7 +1264,7 @@ function extractSymbols(ast: acorn.Node): {
                             const chain = captureMemberChain(left);
                             if (
                                 chain &&
-                                !chain.dynamic &&
+                                !isDynamicChain(chain) &&
                                 chain.root._scopeType === "global"
                             ) {
                                 // If it's dynamic, then we don't save the properties
@@ -1279,17 +1324,19 @@ function extractSymbols(ast: acorn.Node): {
 }
 
 /**
- * Check whether every identifier that could be a story variable in a parsed
- * JavaScript AST satisfies a caller-supplied predicate.
+ * Check whether every identifier that a story format would need to resolve as a
+ * variable in a parsed JavaScript AST satisfies a caller-supplied predicate.
  *
- * This walks the AST once and, for each identifier `isCandidateVariable`
- * accepts (not a property key, label, import binding, built-in JS object,
- * call/`new` callee, or a function declaration's/expression's own
- * name/parameter), asks the predicate whether it counts as a variable. It's
- * the same set of identifiers `extractSymbols` treats as variable occurrences,
- * minus the scope resolution extraction needs -- useful for callers (like
- * `isTwineScriptExpression`) that only need a yes/no answer about the
- * identifiers themselves, not their scope.
+ * This walks the AST once and asks the predicate about every identifier that
+ * reads or writes a name, skipping property keys, labels, import bindings,
+ * built-in JS objects, a function declaration's/expression's own name and
+ * parameters, and call/`new` callees. Callees are skipped because they name
+ * story-format or JS functions (`either(...)`, `visited(...)`), not variables.
+ *
+ * Unlike `isCandidateVariable`, this doesn't follow extraction's temporary
+ * exclusions: a shorthand property's value (`a` in `{a}`) is a read, so it's
+ * checked. It's purpose-built for callers like `isTwineScriptExpression` that
+ * only need a yes/no answer about the identifiers themselves, not their scope.
  *
  * @param ast Parsed AST to walk.
  * @param isVariable Predicate called with each candidate identifier's name and start position.
@@ -1304,7 +1351,12 @@ export function isEveryIdentifierAVariable(
     acornWalk.fullAncestor(ast, (rawNode, _, ancestors) => {
         const node = rawNode as acorn.AnyNode;
         if (node.type !== "Identifier") return;
-        if (!isCandidateVariable(node, ancestors)) return;
+        const role = classifyIdentifier(node, ancestors);
+        if (role === "neither") return;
+        const parent = parentOf(ancestors);
+        if (isCallee(node, parent) || isFunctionOwnBinding(role, parent))
+            return;
+        if (!isPotentialTrackedVariableName(node.name)) return;
 
         if (!isVariable(node.name, node.start)) allValid = false;
     });

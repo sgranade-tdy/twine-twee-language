@@ -510,10 +510,20 @@ describe("JS Parser", () => {
                 expect(result).to.eql(["o@15:variable", "x@17:property"]);
             });
 
-            it("should set a variable token for a constructor's argument but not its callee", () => {
+            it("should set a function token for a constructor's callee and a variable token for its argument", () => {
                 const result = tokensFor("new Foo(bar)");
 
-                expect(result).to.eql(["bar@8:variable"]);
+                expect(result).to.eql(["Foo@4:function", "bar@8:variable"]);
+            });
+
+            it("should set a function token for a member-expression constructor's callee", () => {
+                const result = tokensFor("new obj.Foo(bar)");
+
+                expect(result).to.eql([
+                    "obj@4:variable",
+                    "Foo@8:function",
+                    "bar@12:variable",
+                ]);
             });
 
             it("should not set a function token for a computed, non-static callee", () => {
@@ -1748,11 +1758,11 @@ describe("JS Parser", () => {
             },
             {
                 description:
-                    "new a.B(x) // a member-expression constructor still yields its chain; the argument now shows too",
+                    "new a.B(x) // a member-expression constructor's callee is skipped like a.b(x)'s (ticket 02 review; issue 07 reverses this)",
                 input: "new a.B(x)",
                 isProgram: true,
                 variables: ["a", "x"],
-                properties: ["a.B"],
+                properties: [],
             },
             {
                 description:
