@@ -71,12 +71,20 @@ spelled isn't a story property at all.
 Every occurrence is indexed; the same name occurring five times is five
 occurrences, because rename must rewrite all of them.
 
-**Assignment**: an occurrence that _writes_ the name (`$x = 1`, `$x.y = 1`).
-Twine variables are never declared, so this is the only creation signal the
-parser has — which is why the story formats can force it on for constructs they
-know are writes (`<<set>>`, a setter link, a Chapbook vars section). _Avoid_:
-"definition", which implies a declaration site that Twine JavaScript doesn't
-have.
+**Assignment**: an occurrence the parser _counts_ as writing the name (`$x = 1`,
+`$x.y = 1`), as evidence that the story variable gets set. Twine variables are
+never declared, so this is the only creation signal the parser has. Three things
+count: a root-level **declaration**, always; write-shaped syntax inside an
+**assignment context**; and occurrences a story format forces to be writes (the
+Chapbook vars section, SugarCube receivers). A write the parser doesn't count,
+such as `<<print $x = 1>>`, is a read. _Avoid_: "definition", which implies a
+declaration site that Twine JavaScript doesn't have.
+
+**Assignment context**: a construct whose purpose is to set state (`<<set>>`,
+`<<run>>`, a setter link), so write-shaped syntax inside it (`=`, `++`/`--`,
+destructuring and `for` targets) counts as an assignment. Outside one, an
+assignment is more often a `==` typo or a side effect buried in a read, so the
+parser under-reports. _SugarCube code calls this a setter context._
 
 **Declaration**: a JavaScript binding form — `var`/`let`/`const`, `function`,
 `class`. Unambiguous where an assignment isn't, so a root-level declaration is an

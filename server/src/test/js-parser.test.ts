@@ -585,7 +585,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 2, 1, 6),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
             ]);
             expect(result.properties).to.be.empty;
@@ -619,7 +619,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 2, 1, 6),
                     ),
-                    defined: true,
+                    assigned: true,
                 },
             ]);
             expect(result.properties).to.be.empty;
@@ -652,7 +652,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 2, 1, 6),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
                 {
                     contents: "val1",
@@ -660,7 +660,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 17, 1, 21),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
             ]);
         });
@@ -693,7 +693,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 2, 1, 6),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
                 {
                     contents: "val1",
@@ -701,7 +701,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 25, 1, 29),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
             ]);
         });
@@ -733,7 +733,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 2, 1, 6),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
                 {
                     contents: "var2",
@@ -741,7 +741,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 7, 1, 11),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
             ]);
         });
@@ -776,7 +776,7 @@ describe("JS Parser", () => {
                         Range.create(1, 7, 1, 16),
                     ),
                     prefix: "var1",
-                    defined: true,
+                    assigned: true,
                 },
                 {
                     contents: "rootprop2",
@@ -785,7 +785,7 @@ describe("JS Parser", () => {
                         Range.create(1, 17, 1, 26),
                     ),
                     prefix: "var1.rootprop1",
-                    defined: true,
+                    assigned: true,
                 },
                 {
                     contents: "prop1",
@@ -794,7 +794,7 @@ describe("JS Parser", () => {
                         Range.create(1, 30, 1, 35),
                     ),
                     prefix: "var1.rootprop1.rootprop2",
-                    defined: true,
+                    assigned: true,
                 },
                 {
                     contents: "prop2",
@@ -803,7 +803,7 @@ describe("JS Parser", () => {
                         Range.create(1, 43, 1, 48),
                     ),
                     prefix: "var1.rootprop1.rootprop2",
-                    defined: true,
+                    assigned: true,
                 },
             ]);
         });
@@ -838,7 +838,7 @@ describe("JS Parser", () => {
                         Range.create(1, 8, 1, 17),
                     ),
                     prefix: "var1",
-                    defined: true,
+                    assigned: true,
                 },
                 {
                     contents: "rootprop2",
@@ -847,7 +847,7 @@ describe("JS Parser", () => {
                         Range.create(1, 20, 1, 29),
                     ),
                     prefix: "var1.rootprop1",
-                    defined: true,
+                    assigned: true,
                 },
                 {
                     contents: "prop1",
@@ -856,7 +856,7 @@ describe("JS Parser", () => {
                         Range.create(1, 33, 1, 38),
                     ),
                     prefix: "var1.rootprop1.rootprop2",
-                    defined: true,
+                    assigned: true,
                 },
                 {
                     contents: "prop2",
@@ -865,7 +865,7 @@ describe("JS Parser", () => {
                         Range.create(1, 46, 1, 51),
                     ),
                     prefix: "var1.rootprop1.rootprop2",
-                    defined: true,
+                    assigned: true,
                 },
             ]);
         });
@@ -900,7 +900,7 @@ describe("JS Parser", () => {
                         Range.create(1, 7, 1, 16),
                     ),
                     prefix: "var1",
-                    defined: true,
+                    assigned: true,
                 },
             ]);
         });
@@ -933,7 +933,7 @@ describe("JS Parser", () => {
                         Range.create(1, 7, 1, 16),
                     ),
                     prefix: "var1",
-                    defined: false,
+                    assigned: false,
                 },
                 {
                     contents: "rootprop2",
@@ -942,7 +942,7 @@ describe("JS Parser", () => {
                         Range.create(1, 17, 1, 26),
                     ),
                     prefix: "var1.rootprop1",
-                    defined: false,
+                    assigned: false,
                 },
             ]);
         });
@@ -974,7 +974,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 2, 1, 6),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
             ]);
         });
@@ -1053,7 +1053,7 @@ describe("JS Parser", () => {
                         Range.create(1, 7, 1, 13),
                     ),
                     prefix: "var1",
-                    defined: false,
+                    assigned: false,
                 },
             ]);
         });
@@ -1085,7 +1085,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 2, 1, 6),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
             ]);
         });
@@ -1117,7 +1117,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 2, 1, 6),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
                 {
                     contents: "var2",
@@ -1125,7 +1125,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 9, 1, 13),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
             ]);
             expect(result.properties).to.be.empty;
@@ -1158,13 +1158,13 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 2, 1, 6),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
             ]);
             expect(result.properties).to.be.empty;
         });
 
-        it("should not return a defined function as a variable", () => {
+        it("should not return a declared function as a variable", () => {
             const expression = " function render() {}";
             const offset = 12;
             const state = buildParsingState({
@@ -1284,7 +1284,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 8, 1, 9),
                     ),
-                    defined: true,
+                    assigned: true,
                 },
                 {
                     contents: "g",
@@ -1292,7 +1292,7 @@ describe("JS Parser", () => {
                         "fake-uri",
                         Range.create(1, 31, 1, 32),
                     ),
-                    defined: false,
+                    assigned: false,
                 },
             ]);
             expect(result.properties).to.eql([
@@ -1303,7 +1303,7 @@ describe("JS Parser", () => {
                         Range.create(1, 33, 1, 36),
                     ),
                     prefix: "g",
-                    defined: true,
+                    assigned: true,
                 },
             ]);
         });
@@ -1330,7 +1330,7 @@ describe("JS Parser", () => {
             description: string;
             input: string;
             isProgram: boolean;
-            assignmentIsDefinition?: boolean;
+            isAssignmentContext?: boolean;
             hostGlobals?: ReadonlySet<string>;
             variables: string[];
             properties: string[];
@@ -1347,13 +1347,13 @@ describe("JS Parser", () => {
                 /[.=]/.test(s) ? JSON.stringify(s) : s;
             return {
                 variables: result.variables.map(
-                    (v) => v.contents + (v.defined ? "=" : ""),
+                    (v) => v.contents + (v.assigned ? "=" : ""),
                 ),
                 properties: result.properties.map(
                     (p) =>
                         (p.prefix !== undefined ? p.prefix + "." : "") +
                         name(p.contents) +
-                        (p.defined ? "=" : ""),
+                        (p.assigned ? "=" : ""),
                 ),
                 error: result.error?.message,
             };
@@ -1755,7 +1755,7 @@ describe("JS Parser", () => {
                 properties: [],
             },
 
-            // --- Writes, with and without assignmentIsDefinition ---
+            // --- Writes, with and without isAssignmentContext ---
             {
                 description: "a = b = 1",
                 input: "a = b = 1",
@@ -1764,10 +1764,10 @@ describe("JS Parser", () => {
                 properties: [],
             },
             {
-                description: "a = b = 1, assignmentIsDefinition",
+                description: "a = b = 1, isAssignmentContext",
                 input: "a = b = 1",
                 isProgram: true,
-                assignmentIsDefinition: true,
+                isAssignmentContext: true,
                 variables: ["a=", "b="],
                 properties: [],
             },
@@ -1779,10 +1779,10 @@ describe("JS Parser", () => {
                 properties: [],
             },
             {
-                description: "a += 1, assignmentIsDefinition",
+                description: "a += 1, isAssignmentContext",
                 input: "a += 1",
                 isProgram: true,
-                assignmentIsDefinition: true,
+                isAssignmentContext: true,
                 variables: ["a="],
                 properties: [],
             },
@@ -1795,10 +1795,10 @@ describe("JS Parser", () => {
             },
             {
                 description:
-                    "a++, assignmentIsDefinition // defect 9: ++ never counts as a write",
+                    "a++, isAssignmentContext // defect 9: ++ never counts as a write",
                 input: "a++",
                 isProgram: true,
-                assignmentIsDefinition: true,
+                isAssignmentContext: true,
                 variables: ["a"], // defect 9
                 properties: [],
             },
@@ -1811,10 +1811,10 @@ describe("JS Parser", () => {
             },
             {
                 description:
-                    "[a,b] = c, assignmentIsDefinition // defect 9: destructuring never counts as a write",
+                    "[a,b] = c, isAssignmentContext // defect 9: destructuring never counts as a write",
                 input: "[a,b] = c",
                 isProgram: true,
-                assignmentIsDefinition: true,
+                isAssignmentContext: true,
                 variables: ["a", "b", "c"], // defect 9
                 properties: [],
             },
@@ -1827,10 +1827,10 @@ describe("JS Parser", () => {
             },
             {
                 description:
-                    "({a} = c), assignmentIsDefinition // defect 9: destructuring never counts as a write",
+                    "({a} = c), isAssignmentContext // defect 9: destructuring never counts as a write",
                 input: "({a} = c)",
                 isProgram: true,
-                assignmentIsDefinition: true,
+                isAssignmentContext: true,
                 variables: ["a", "c"], // defect 9
                 properties: [],
             },
@@ -1842,10 +1842,10 @@ describe("JS Parser", () => {
                 properties: ["a.b="], // ticket 12: without the flag, a property assignment should be a read
             },
             {
-                description: "a.b += 1, assignmentIsDefinition",
+                description: "a.b += 1, isAssignmentContext",
                 input: "a.b += 1",
                 isProgram: true,
-                assignmentIsDefinition: true,
+                isAssignmentContext: true,
                 variables: ["a"],
                 properties: ["a.b="],
             },
@@ -1857,10 +1857,10 @@ describe("JS Parser", () => {
                 properties: [],
             },
             {
-                description: "var a; a = 1, assignmentIsDefinition",
+                description: "var a; a = 1, isAssignmentContext",
                 input: "var a; a = 1",
                 isProgram: true,
-                assignmentIsDefinition: true,
+                isAssignmentContext: true,
                 variables: ["a=", "a="],
                 properties: [],
             },
@@ -2168,7 +2168,7 @@ describe("JS Parser", () => {
             description,
             input,
             isProgram,
-            assignmentIsDefinition,
+            isAssignmentContext,
             hostGlobals,
             variables,
             properties,
@@ -2191,7 +2191,7 @@ describe("JS Parser", () => {
                     0,
                     state.textDocument,
                     storyState,
-                    assignmentIsDefinition,
+                    isAssignmentContext,
                 );
 
                 expect(compact(result)).to.eql({
