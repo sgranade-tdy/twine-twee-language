@@ -267,6 +267,7 @@ function bindIdentifier(
         | "const"
         | "param"
         | "function"
+        | "class"
         | "using"
         | "await using",
 ): Scope {
@@ -275,6 +276,24 @@ function bindIdentifier(
     target.bindings.add(name);
 
     return target;
+}
+
+/**
+ * Bind a declaration's name and mark the identifier as a definition in the
+ * scope it bound to.
+ *
+ * @param scope Scope in which to declare the binding.
+ * @param id Identifier being declared.
+ * @param kind Kind of binding.
+ */
+function bindDeclaredName(
+    scope: Scope,
+    id: acorn.Identifier,
+    kind: Parameters<typeof bindIdentifier>[2],
+): void {
+    const boundScope = bindIdentifier(scope, id.name, kind);
+    (id as ScopedIdentifier)._isDefinition = true;
+    (id as ScopedIdentifier)._scopeType = boundScope.type;
 }
 
 /**
@@ -352,8 +371,8 @@ function collectPatternIdentifiers(
 
 /**
  * How an identifier functions in the AST: whether it's a declaration
- * (a name being bound, e.g. `var`/`let`/`const`, a function name or
- * parameter, or a `catch` parameter), a reference (an occurrence that reads
+ * (a name being bound, e.g. `var`/`let`/`const`, a function or class name,
+ * a function parameter, or a `catch` parameter), a reference (an occurrence that reads
  * -- or, if the caller forces assignments to count as writes, writes -- a
  * bound or unbound name), or neither (a property key, a label, or an import
  * binding, none of which are ever variables).
@@ -459,6 +478,56 @@ function annotateVariableScopes(
 ) {
     const globalScope = createScope("global");
 
+    /**
+     * Visit the expressions embedded in a binding pattern -- default values
+     * and computed keys -- without re-visiting the names it binds.
+     *
+     * @param pattern Pattern to walk.
+     * @param scope Scope the embedded expressions are evaluated in.
+     * @param ancestors Pattern's ancestors, ending with `pattern` itself.
+     */
+    function visitPatternExpressions(
+        pattern: acorn.AnyNode,
+        scope: Scope,
+        ancestors: acorn.Node[],
+    ): void {
+        const into = (child: acorn.AnyNode, path: acorn.Node[]) =>
+            visitPatternExpressions(child, scope, [...ancestors, ...path]);
+
+        switch (pattern.type) {
+            case "ObjectPattern":
+                for (const prop of pattern.properties) {
+                    if (prop.type === "Property") {
+                        if (prop.computed)
+                            visit(prop.key, scope, [
+                                ...ancestors,
+                                prop,
+                                prop.key,
+                            ]);
+                        into(prop.value, [prop, prop.value]);
+                    } else {
+                        into(prop, [prop]);
+                    }
+                }
+                break;
+
+            case "ArrayPattern":
+                for (const element of pattern.elements) {
+                    if (element) into(element, [element]);
+                }
+                break;
+
+            case "AssignmentPattern":
+                into(pattern.left, [pattern.left]);
+                visit(pattern.right, scope, [...ancestors, pattern.right]);
+                break;
+
+            case "RestElement":
+                into(pattern.argument, [pattern.argument]);
+                break;
+        }
+    }
+
     function visit(node: acorn.AnyNode, scope: Scope, ancestors: acorn.Node[]) {
         switch (node.type) {
             case "Program":
@@ -473,15 +542,7 @@ function annotateVariableScopes(
             }
 
             case "FunctionDeclaration": {
-                if (node.id) {
-                    const boundScope = bindIdentifier(
-                        scope,
-                        node.id.name,
-                        "function",
-                    );
-                    (node.id as ScopedIdentifier)._isDefinition = true;
-                    (node.id as ScopedIdentifier)._scopeType = boundScope.type;
-                }
+                if (node.id) bindDeclaredName(scope, node.id, "function");
                 const fnScope = createScope("function", scope);
                 for (const param of node.params) {
                     collectPatternIdentifiers(param as acorn.AnyNode, (id) => {
@@ -508,16 +569,7 @@ function annotateVariableScopes(
                 for (const decl of node.declarations) {
                     collectPatternIdentifiers(
                         decl.id as acorn.AnyNode,
-                        (id) => {
-                            const boundScope = bindIdentifier(
-                                scope,
-                                id.name,
-                                node.kind,
-                            );
-                            (id as ScopedIdentifier)._isDefinition = true;
-                            (id as ScopedIdentifier)._scopeType =
-                                boundScope.type;
-                        },
+                        (id) => bindDeclaredName(scope, id, node.kind),
                     );
                     if (decl.init)
                         visit(decl.init, scope, [...ancestors, decl.init]);
@@ -562,43 +614,27 @@ function annotateVariableScopes(
                             bindIdentifier(catchScope, id.name, "param");
                         },
                     );
+                    // Default values and computed keys inside the pattern
+                    // are ordinary expressions that still need resolving.
+                    visitPatternExpressions(node.param, catchScope, [
+                        ...ancestors,
+                        node.param,
+                    ]);
                 }
                 visit(node.body, catchScope, [...ancestors, node.body]);
                 return;
             }
 
-            case "ClassDeclaration": {
-                if (node.id) {
-                    const boundScope = bindIdentifier(
-                        scope,
-                        node.id.name,
-                        "function",
-                    );
-                    (node.id as ScopedIdentifier)._isDefinition = true;
-                    (node.id as ScopedIdentifier)._scopeType = boundScope.type;
-                }
-                if (node.superClass)
-                    visit(node.superClass, scope, [
-                        ...ancestors,
-                        node.superClass,
-                    ]);
-                visit(node.body, scope, [...ancestors, node.body]);
-                return;
-            }
-
+            case "ClassDeclaration":
             case "ClassExpression": {
-                // Unlike a class declaration's name, a class expression's
-                // name is only visible inside its own body.
+                // A class declaration's name binds in the enclosing scope,
+                // but a class expression's name is only visible inside its
+                // own body.
                 let bodyScope = scope;
                 if (node.id) {
-                    bodyScope = createScope("block", scope);
-                    const boundScope = bindIdentifier(
-                        bodyScope,
-                        node.id.name,
-                        "function",
-                    );
-                    (node.id as ScopedIdentifier)._isDefinition = true;
-                    (node.id as ScopedIdentifier)._scopeType = boundScope.type;
+                    if (node.type === "ClassExpression")
+                        bodyScope = createScope("block", scope);
+                    bindDeclaredName(bodyScope, node.id, "class");
                 }
                 if (node.superClass)
                     visit(node.superClass, scope, [

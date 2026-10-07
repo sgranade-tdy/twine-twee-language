@@ -1576,7 +1576,31 @@ describe("JS Parser", () => {
             },
             {
                 description:
-                    "class A {} // defect 4, fixed by ticket 03: the class name now binds; as a global declaration, it counts as a definition",
+                    "try{}catch({a = b}){a} // a catch param's default value is still a read",
+                input: "try{}catch({a = b}){a}",
+                isProgram: true,
+                variables: ["b"],
+                properties: [],
+            },
+            {
+                description:
+                    "try{}catch({[k]: v}){v} // a catch param's computed key is still a read",
+                input: "try{}catch({[k]: v}){v}",
+                isProgram: true,
+                variables: ["k"],
+                properties: [],
+            },
+            {
+                description:
+                    "try{}catch([a, b = a]){} // a catch param's default sees earlier params",
+                input: "try{}catch([a, b = a]){}",
+                isProgram: true,
+                variables: [],
+                properties: [],
+            },
+            {
+                description:
+                    "class A {} // defect 4, fixed by ticket 03: the class name now binds; as a root-level declaration, it counts as an assignment",
                 input: "class A {}",
                 isProgram: true,
                 variables: ["A="], // defect 4, fixed
