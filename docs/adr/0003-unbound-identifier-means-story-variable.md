@@ -22,3 +22,5 @@ binder coverage is a correctness concern, not a nicety.
 It also sets the seam: `js-parser.ts` knows only JavaScript. Which names are
 _story-format_ built-ins (`State`, `setup`, `_args`) is decided downstream, by
 the Chapbook and SugarCube parsers.
+
+Scope resolution itself is delegated to `eslint-scope`; see ADR-0004.
