@@ -63,6 +63,11 @@ story format decides which host globals to exclude, because the answer depends
 on how the format spells story variables. SugarCube's sigils can't collide with
 a host global, but Chapbook's bare names can (`location`, `history`).
 
+**Story-format built-in**: a name the story format itself provides (`State`,
+`setup`, SugarCube's `either()` and `visited()`). Not a host global. Per ADR-0003
+the story-format parser decides which ones aren't story variables; it may hand
+some to `js-parser.ts` in the same exclusion set as its host globals.
+
 **Story property**: a member reached from a story variable, carried with the full
 dotted path that reaches it (`prefix` + name). A property whose path can't be
 spelled isn't a story property at all.

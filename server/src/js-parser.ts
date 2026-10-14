@@ -790,8 +790,7 @@ function isFunctionOwnBinding(
  * function's own name or parameter?
  *
  * Callees and shorthand object-literal values are real occurrences. A function
- * declaration's or function expression's own name and parameters aren't (issue
- * 06 is what starts treating declarations as story-variable writes).
+ * declaration's or function expression's own name and parameters aren't.
  * Arrow-function parameters aren't excluded here: they never resolve to a story
  * variable because they're never scope-annotated, but they're still highlighted
  * as variables. Everything else -- references, plus `var`/`let`/`const` and
@@ -1138,13 +1137,14 @@ function extractSymbols(
                               ].join(".")
                             : undefined;
 
-                    // Only the final segment is written; the rest are reads
+                    // Only the final segment is written or called; the rest are reads
+                    const isLast = i === chain.properties.length - 1;
                     captureProperty(
                         prop.name,
                         prop.start,
                         scope,
-                        written && i === chain.properties.length - 1,
-                        lastIsCallee && i === chain.properties.length - 1,
+                        written && isLast,
+                        lastIsCallee && isLast,
                     );
                 });
                 break;
@@ -1263,7 +1263,7 @@ function extractSymbols(
  * parameters, and call/`new` callees. Callees are skipped because they name
  * story-format or JS functions (`either(...)`, `visited(...)`), not variables.
  *
- * Unlike `isCandidateVariable`, this skips callees, which extraction now
+ * Unlike `isCandidateVariable`, this skips callees, which extraction
  * indexes. It's purpose-built for callers like `isTwineScriptExpression` that
  * only need a yes/no answer about the identifiers themselves, not their scope.
  *

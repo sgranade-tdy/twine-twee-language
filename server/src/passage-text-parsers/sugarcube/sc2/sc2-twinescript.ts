@@ -16,25 +16,30 @@ import {
 } from "../../host-globals";
 
 /**
- * SugarCube's global functions, which a called identifier would otherwise
- * index as a story variable.
+ * SugarCube's story-format built-in functions, which a called identifier would
+ * otherwise index as a story variable.
+ *
+ * Taken from https://www.motoslave.net/sugarcube/2/docs/#functions
  */
-const sugarCubeGlobalFunctions: ReadonlySet<string> = new Set([
+const sugarCubeBuiltInFunctions: ReadonlySet<string> = new Set([
     "clone",
     "either",
     "forget",
     "hasVisited",
+    "importScripts",
+    "importStyles",
     "lastVisited",
     "memorize",
     "passage",
     "previous",
     "random",
-    "randomInt",
+    "randomFloat",
     "recall",
     "setPageElement",
     "tags",
     "temporary",
     "time",
+    "triggerEvent",
     "turns",
     "variables",
     "visited",
@@ -42,13 +47,14 @@ const sugarCubeGlobalFunctions: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Host globals that are never SugarCube story variables. Story and temporary
- * variables are sigiled (`$x`, `_x`) and desugared to `Xx` before JavaScript
- * parsing, so no bare host name can collide with one, and a bare `$` that
- * survives desugaring is always jQuery.
+ * Globals that are never SugarCube story variables: SugarCube's built-in
+ * functions plus host globals. Story and temporary variables are sigiled
+ * (`$x`, `_x`) and desugared to `Xx` before JavaScript parsing, so no bare
+ * host name can collide with one, and a bare `$` that survives desugaring is
+ * always jQuery.
  */
-export const sugarCubeHostGlobals: ReadonlySet<string> = new Set([
-    ...sugarCubeGlobalFunctions,
+export const sugarCubeExcludedGlobals: ReadonlySet<string> = new Set([
+    ...sugarCubeBuiltInFunctions,
     ...browserGlobals,
     ...collisionProneBrowserGlobals,
     ...jQueryGlobals,
@@ -251,7 +257,7 @@ export function isTwineScriptExpression(expression: string): boolean {
                 }
                 return startIsVarRegexp.test(text);
             },
-            sugarCubeHostGlobals,
+            sugarCubeExcludedGlobals,
         );
     } catch {
         return false;

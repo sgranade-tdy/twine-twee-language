@@ -196,7 +196,8 @@ export interface StoryFormatParsingState {
     passageTokens: Record<number, PreSemanticToken>;
     /**
      * Host (browser, library) globals that are never story variables in this
-     * story format. JavaScript's own globals are always excluded; see
+     * story format, plus any story-format built-ins the format wants excluded
+     * the same way. JavaScript's own globals are always excluded; see
      * `host-globals.ts`.
      */
     hostGlobals?: ReadonlySet<string>;

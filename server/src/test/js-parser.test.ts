@@ -6,7 +6,7 @@ import { buildParsingState, MockCallbacks } from "./builders";
 import { ETokenType } from "../semantic-tokens";
 import { StoryFormatParsingState } from "../passage-text-parsers";
 import { browserGlobals } from "../passage-text-parsers/host-globals";
-import { sugarCubeHostGlobals } from "../passage-text-parsers/sugarcube/sc2/sc2-twinescript";
+import { sugarCubeExcludedGlobals } from "../passage-text-parsers/sugarcube/sc2/sc2-twinescript";
 import * as uut from "../js-parser";
 
 describe("JS Parser", () => {
@@ -2004,6 +2004,13 @@ describe("JS Parser", () => {
                 properties: ["$utils.greet="],
             },
             {
+                description: "$arr.push(x) // a called method name is a callee",
+                input: "$arr.push(x)",
+                isProgram: true,
+                variables: ["$arr", "x"],
+                properties: ["$arr.push()"],
+            },
+            {
                 description:
                     "$arr.push = f // a non-called method name isn't a callee",
                 input: "$arr.push = f",
@@ -2193,7 +2200,7 @@ describe("JS Parser", () => {
                 description: "$('#x').hide()",
                 input: "$('#x').hide()",
                 isProgram: true,
-                hostGlobals: sugarCubeHostGlobals,
+                hostGlobals: sugarCubeExcludedGlobals,
                 variables: [],
                 properties: [],
             },
@@ -2248,7 +2255,7 @@ describe("JS Parser", () => {
                     "location.x = history // SugarCube: no bare name is a story variable",
                 input: "location.x = history",
                 isProgram: true,
-                hostGlobals: sugarCubeHostGlobals,
+                hostGlobals: sugarCubeExcludedGlobals,
                 variables: [],
                 properties: [],
             },
@@ -2256,7 +2263,7 @@ describe("JS Parser", () => {
                 description: "jQuery.fx.off = a",
                 input: "jQuery.fx.off = a",
                 isProgram: true,
-                hostGlobals: sugarCubeHostGlobals,
+                hostGlobals: sugarCubeExcludedGlobals,
                 variables: ["a"],
                 properties: [],
             },

@@ -8,6 +8,10 @@ import { SugarCubeParsingState } from "./sugarcube-parser";
 import { builtinVars, builtInVarsAndProperties } from "./sugarcube-variables";
 import { OSugarCubeSymbolKind } from "./types";
 
+function isInScriptMacro(sugarcubeState: SugarCubeParsingState): boolean {
+    return sugarcubeState.unclosedMacros.some((p) => p.name === "script");
+}
+
 /**
  * Create symbol references for tokenized variables and properties, and log any tokenizing error.
  *
@@ -55,10 +59,7 @@ export function createVariableAndPropertyReferences(
             }
         }
         // Don't capture the auto-generated variable `output` in a <<script>> macro
-        else if (
-            v.contents === "output" &&
-            sugarcubeState.unclosedMacros.find((p) => p.name === "script")
-        ) {
+        else if (v.contents === "output" && isInScriptMacro(sugarcubeState)) {
             // Do nothing!
         }
         // Don't save any references to SugarCube-specific variables
@@ -121,7 +122,7 @@ export function createVariableAndPropertyReferences(
         // Don't capture properties of the auto-generated variable `output` in a <<script>> macro
         if (
             (contents === "output" || contents.startsWith("output.")) &&
-            sugarcubeState.unclosedMacros.find((p) => p.name === "script")
+            isInScriptMacro(sugarcubeState)
         ) {
             continue;
         }

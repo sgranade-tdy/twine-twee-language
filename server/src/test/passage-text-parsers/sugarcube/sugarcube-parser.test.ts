@@ -256,6 +256,53 @@ describe("SugarCube Parser", () => {
             expect(result).to.eql(["v"]);
         });
 
+        it("should not treat SugarCube's built-in functions as variables in a script passage", () => {
+            const header = ":: Passage [script]\n";
+            const builtInFunctions = [
+                "clone",
+                "either",
+                "forget",
+                "hasVisited",
+                "importScripts",
+                "importStyles",
+                "lastVisited",
+                "memorize",
+                "passage",
+                "previous",
+                "random",
+                "randomFloat",
+                "recall",
+                "setPageElement",
+                "tags",
+                "temporary",
+                "time",
+                "triggerEvent",
+                "turns",
+                "variables",
+                "visited",
+                "visitedTags",
+            ];
+            const passage =
+                "\n" +
+                builtInFunctions.map((f) => `${f}();`).join(" ") +
+                " v;\n";
+            const callbacks = new MockCallbacks();
+            const state = buildParsingState({
+                content: header + passage,
+                callbacks: callbacks,
+            });
+            state.currentPassage = buildPassage({
+                label: "Passage",
+                isScript: true,
+            });
+            const parser = uut.getSugarCubeParser(undefined);
+
+            parser?.parsePassageText(passage, header.length, state);
+            const result = callbacks.references.map((r) => r.contents);
+
+            expect(result).to.eql(["v"]);
+        });
+
         it("should parse variables that include line continuations in a script passage", () => {
             const header = ":: Passage [script]\n";
             const passage =
