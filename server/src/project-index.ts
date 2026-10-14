@@ -30,12 +30,26 @@ export interface Label {
 /**
  * A label with a number that identifies the kind of label it is.
  */
-export interface ProjSymbol extends Label, Kind {
+export interface Callable {
     /**
      * For properties, whether the property is the callee of a call or `new`.
+     * On `References`, true only if every location is such a callee.
      */
     isCallee?: boolean;
 }
+
+/**
+ * Spread-ready `isCallee` flag that's absent unless true, keeping indexed
+ * shapes sparse.
+ */
+export function calleeFlag(source: Callable): Callable {
+    return source.isCallee ? { isCallee: true } : {};
+}
+
+/**
+ * A label with a number that identifies the kind of label it is.
+ */
+export interface ProjSymbol extends Label, Kind, Callable {}
 
 /**
  * Kind of a Twine symbol.
@@ -49,13 +63,9 @@ export enum TwineSymbolKind {
 /**
  * References, which have contents, locations, and an identifier for its kind.
  */
-export interface References extends Kind {
+export interface References extends Kind, Callable {
     contents: string;
     locations: Location[];
-    /**
-     * For property references, true if every location is a call or `new` callee.
-     */
-    isCallee?: boolean;
 }
 
 /**

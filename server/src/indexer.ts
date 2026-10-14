@@ -17,6 +17,7 @@ import {
     ProjSymbol,
     References,
     StoryData,
+    calleeFlag,
 } from "./project-index";
 import { SemanticToken } from "./semantic-tokens";
 
@@ -142,7 +143,7 @@ export function updateProjectIndex(
             contents: symbol.contents,
             locations: [],
             kind: symbol.kind,
-            ...(symbol.isCallee ? { isCallee: true } : {}),
+            ...calleeFlag(symbol),
         };
         ref.locations.push(symbol.location);
         referencesMap[key] = ref;

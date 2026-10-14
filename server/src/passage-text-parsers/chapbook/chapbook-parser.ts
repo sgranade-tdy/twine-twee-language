@@ -26,7 +26,7 @@ import {
     logSemanticTokenFor,
     parsePassageReference,
 } from "../../parser";
-import { ProjectIndex } from "../../project-index";
+import { calleeFlag, ProjectIndex } from "../../project-index";
 import { ETokenType, ETokenModifier } from "../../semantic-tokens";
 import { Token } from "../../types";
 import {
@@ -154,7 +154,7 @@ function createVariableAndPropertyReferences(
                 isSet || p.assigned
                     ? OChapbookSymbolKind.PropertySet
                     : OChapbookSymbolKind.Property,
-            ...(p.isCallee ? { isCallee: true } : {}),
+            ...calleeFlag(p),
         });
     }
     if (jsTokens.error) {

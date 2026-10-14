@@ -1,4 +1,5 @@
 import { DiagnosticCodes } from "@tt3/shared";
+import { calleeFlag } from "../../project-index";
 import { createDiagnosticFromRange } from "../../diagnostics";
 import { TokenizedJS } from "../../js-parser";
 import { logDiagnostic, logRawDiagnostic, ParsingState } from "../../parser";
@@ -94,7 +95,7 @@ export function createVariableAndPropertyReferences(
                     contents: (isTemporary ? "_" : "$") + contents.slice(16),
                     location: p.location,
                     assigned: p.assigned,
-                    ...(p.isCallee ? { isCallee: true } : {}),
+                    ...calleeFlag(p),
                 };
                 const firstPeriodNdx = ref.contents.indexOf(".");
                 if (firstPeriodNdx === -1) {
@@ -134,7 +135,7 @@ export function createVariableAndPropertyReferences(
                     isSet || p.assigned
                         ? OSugarCubeSymbolKind.PropertySet
                         : OSugarCubeSymbolKind.Property,
-                ...(p.isCallee ? { isCallee: true } : {}),
+                ...calleeFlag(p),
             });
     }
     if (jsTokens.error) {

@@ -14,7 +14,7 @@ import {
     StoryFormatParsingState,
     capturePreSemanticTokenFor,
 } from "./passage-text-parsers";
-import { Label } from "./project-index";
+import { Callable, calleeFlag, Label } from "./project-index";
 import { ETokenType, TokenModifier, TokenType } from "./semantic-tokens";
 
 /**
@@ -39,7 +39,7 @@ export interface JSVariableLabel extends Label {
 /**
  * Label for a parsed javascript property.
  */
-export interface JSPropertyLabel extends Label {
+export interface JSPropertyLabel extends Label, Callable {
     /**
      * The property's prefix, if known. A reference for `subprop` from `var.prop.subprop` will
      * have a prefix of `var.prop`.
@@ -49,10 +49,6 @@ export interface JSPropertyLabel extends Label {
      * Whether the property is being assigned to.
      */
     assigned?: boolean;
-    /**
-     * Whether the property is the callee of a call or `new` (`push` in `$arr.push(x)`).
-     */
-    isCallee?: boolean;
 }
 
 export namespace JSPropertyLabel {
@@ -610,10 +606,9 @@ function isGlobalObjectScope(
  * @param property Property reference to inspect, with its full path in `contents`.
  * @returns True if the property matches a built-in property or called built-in method.
  */
-export function isBuiltinJSProperty(property: {
-    contents: string;
-    isCallee?: boolean;
-}): boolean {
+export function isBuiltinJSProperty(
+    property: Pick<Label, "contents"> & Callable,
+): boolean {
     const name = property.contents.split(".").pop() || "";
     return (
         builtInJSObjectInstanceProperties.has(name) ||
@@ -1467,7 +1462,7 @@ export function tokenizeJavaScript(
                 ),
                 prefix: property.scope,
                 assigned: property.assigned,
-                ...(property.isCallee ? { isCallee: true } : {}),
+                ...calleeFlag(property),
             });
         }
     }
