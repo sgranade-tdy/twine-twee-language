@@ -337,6 +337,49 @@ function isWriteReference(
 }
 
 /**
+ * Is a member expression in a write position, given the caller's assignment
+ * context?
+ *
+ * The sibling of `isWriteReference` for nodes eslint-scope has no `Reference`
+ * for. It covers the same positions as `ref.isWrite()` (assignment targets,
+ * including compound; `++`/`--` operands; destructuring targets, defaults and
+ * rests; `for` heads). A member can't be declared, so there's no init case.
+ *
+ * @param node Member expression being inspected.
+ * @param ancestors The node's ancestors, ending with `node` itself.
+ * @param isAssignmentContext True if write-shaped syntax counts as an assignment.
+ */
+function isWriteTarget(
+    node: acorn.MemberExpression,
+    ancestors: acorn.Node[],
+    isAssignmentContext: boolean,
+): boolean {
+    if (!isAssignmentContext) return false;
+    const parent = parentOf(ancestors);
+    switch (parent?.type) {
+        case "AssignmentExpression":
+        case "AssignmentPattern":
+            return parent.left === node;
+        case "UpdateExpression":
+            return parent.argument === node;
+        case "ForInStatement":
+        case "ForOfStatement":
+            return parent.left === node;
+        case "ArrayPattern":
+        case "RestElement":
+            return true;
+        case "ObjectPattern":
+            // acorn-walk skips the `Property` between the pattern and its
+            // value, so find which property (if any) holds this node.
+            return parent.properties.some(
+                (prop) => prop.type === "Property" && prop.value === node,
+            );
+        default:
+            return false;
+    }
+}
+
+/**
  * Does the top level of a program use `import` or `export`?
  */
 function hasModuleSyntax(program: ESTree.Program): boolean {
@@ -545,21 +588,6 @@ function getStaticPropertyName(
 }
 
 /**
- * Determine if a member expression is being assigned to.
- *
- * @param node Member expression being inspected.
- * @param ancestors The node's ancestors.
- * @returns True if the member expression is being assigned to.
- */
-function isMemberExpressionAssignment(
-    node: acorn.MemberExpression,
-    ancestors: acorn.Node[],
-): boolean {
-    const parent = parentOf(ancestors);
-    return parent?.type === "AssignmentExpression" && parent.left === node;
-}
-
-/**
  * Get all of the members of a member expression.
  *
  * @param node Member expression to capture all members.
@@ -607,6 +635,8 @@ function captureMemberChain(
  * @param node ObjectExpression node.
  * @param parentScope Parent scope for the object expression.
  * @param capturePropertyCallback Callback for capturing a property's token.
+ * @param isGlobalName Predicate for host globals.
+ * @param assigned Whether the literal's keys count as written.
  */
 function captureObjectExpressionProperties(
     node: acorn.ObjectExpression,
@@ -618,6 +648,7 @@ function captureObjectExpressionProperties(
         assigned?: boolean,
     ) => void,
     isGlobalName: IsGlobalName,
+    assigned: boolean,
 ) {
     const isGlobalObject = isGlobalObjectScope(parentScope, isGlobalName);
 
@@ -636,7 +667,7 @@ function captureObjectExpressionProperties(
             propName,
             prop.key.start,
             isGlobalObject ? undefined : parentScope,
-            true,
+            assigned,
         );
 
         // Recurse for contained object literals
@@ -651,6 +682,7 @@ function captureObjectExpressionProperties(
                 newScope,
                 capturePropertyCallback,
                 isGlobalName,
+                assigned,
             );
         }
     }
@@ -956,11 +988,14 @@ interface RawPropertyOccurrence {
  * or keywords.
  *
  * @param ast Parsed text, already annotated by `annotateVariableScopes`.
+ * @param isGlobalName Predicate for host globals.
+ * @param isAssignmentContext True if write-shaped syntax counts as an assignment.
  * @returns Variable and property occurrences, in ascending order of position.
  */
 function extractSymbols(
     ast: acorn.Node,
     isGlobalName: IsGlobalName,
+    isAssignmentContext: boolean,
 ): {
     variables: RawVariableOccurrence[];
     properties: RawPropertyOccurrence[];
@@ -1019,7 +1054,11 @@ function extractSymbols(
                     break;
                 }
 
-                const assigned = isMemberExpressionAssignment(node, ancestors);
+                const written = isWriteTarget(
+                    node,
+                    ancestors,
+                    isAssignmentContext,
+                );
                 const isGlobal = isGlobalName(chain.root.name);
 
                 // Add the root variable
@@ -1055,12 +1094,12 @@ function extractSymbols(
                               ].join(".")
                             : undefined;
 
-                    // Only count the property as assigned if its root is a story variable
+                    // Only the final segment is written; the rest are reads
                     captureProperty(
                         prop.name,
                         prop.start,
                         scope,
-                        assigned && chain.root._scopeType === "global",
+                        written && i === chain.properties.length - 1,
                     );
                 });
                 break;
@@ -1076,6 +1115,8 @@ function extractSymbols(
 
                 // Find the parent scope (if any) for the property
                 let parentScope: string | undefined;
+                // A declaration's keys are always written; a bare assignment's follow the flag
+                let keysAssigned = isAssignmentContext;
 
                 for (let i = ancestors.length - 2; i >= 0; i--) {
                     const ancestor = ancestors[i] as acorn.AnyNode;
@@ -1098,6 +1139,7 @@ function extractSymbols(
                                     parentScope,
                                     captureProperty,
                                     isGlobalName,
+                                    isAssignmentContext,
                                 );
                             }
                             break;
@@ -1118,6 +1160,7 @@ function extractSymbols(
                                     parentScope,
                                     captureProperty,
                                     isGlobalName,
+                                    isAssignmentContext,
                                 );
                                 break;
                             }
@@ -1139,7 +1182,9 @@ function extractSymbols(
                                 parentScope,
                                 captureProperty,
                                 isGlobalName,
+                                true,
                             );
+                            keysAssigned = true;
                         }
                         break;
                     }
@@ -1153,7 +1198,7 @@ function extractSymbols(
                     isGlobalObjectScope(parentScope || "", isGlobalName)
                         ? undefined
                         : parentScope || undefined,
-                    true,
+                    keysAssigned,
                 );
                 break;
             }
@@ -1339,7 +1384,11 @@ export function tokenizeJavaScript(
         }
 
         // Extraction pass: scope-resolved variables and properties, no operators/literals/keywords.
-        const { variables, properties } = extractSymbols(ast, isGlobalName);
+        const { variables, properties } = extractSymbols(
+            ast,
+            isGlobalName,
+            !!isAssignmentContext,
+        );
         for (const variable of variables) {
             tokenized.variables.push({
                 contents: variable.text,
