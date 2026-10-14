@@ -1,4 +1,4 @@
-import { ParsingState } from "../../../parser";
+import { ParsingState } from "../../types";
 import { MacroLocationInfo, SugarCubeParsingState } from "../sugarcube-parser";
 import { createVariableAndPropertyReferences } from "../sugarcube-utils";
 import { tokenizeTwineScriptExpression } from "../sc2/sc2-twinescript";

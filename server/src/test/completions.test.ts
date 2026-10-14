@@ -15,6 +15,7 @@ import { diagnosticCodeSet, DisableDiagnosticTag } from "@tt3/shared";
 import { Index } from "../project-index";
 import { buildPassage, buildTag } from "./builders";
 import * as ptpModule from "../passage-text-parsers";
+import type { StoryFormatParser } from "../passage-text-parsers/types";
 import * as embeddedLanguagesModule from "../embedded-languages";
 
 import * as uut from "../completions";
@@ -793,7 +794,7 @@ describe("Completions", () => {
                     return {
                         id: "FakeFormat",
                         generateCompletions: () => completionList,
-                    } as unknown as ptpModule.StoryFormatParser;
+                    } as unknown as StoryFormatParser;
                 },
             };
 
@@ -852,7 +853,7 @@ describe("Completions", () => {
                             }
                             return completionList;
                         },
-                    } as unknown as ptpModule.StoryFormatParser;
+                    } as unknown as StoryFormatParser;
                 },
             };
 
@@ -950,7 +951,7 @@ describe("Completions", () => {
                     return {
                         id: "FakeFormat",
                         generateCompletions: () => completionList,
-                    } as unknown as ptpModule.StoryFormatParser;
+                    } as unknown as StoryFormatParser;
                 },
             };
 

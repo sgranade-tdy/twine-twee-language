@@ -1,4 +1,4 @@
-import { StoryFormatParser } from "..";
+import { StoryFormatParser } from "../types";
 import { parsePassageText } from "./chapbook-parser";
 import { generateCompletions } from "./chapbook-completions";
 import { getDefinitionAt } from "./chapbook-definitions";

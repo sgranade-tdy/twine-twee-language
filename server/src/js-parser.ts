@@ -13,7 +13,7 @@ import { createLocationFor } from "./parser";
 import {
     StoryFormatParsingState,
     capturePreSemanticTokenFor,
-} from "./passage-text-parsers";
+} from "./passage-text-parsers/types";
 import { Callable, calleeFlag, Label } from "./project-index";
 import { ETokenType, TokenModifier, TokenType } from "./semantic-tokens";
 

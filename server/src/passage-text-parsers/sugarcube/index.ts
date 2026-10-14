@@ -1,5 +1,5 @@
 import { SC2MacroInfo } from "@tt3/shared";
-import { StoryFormatParser } from "..";
+import { StoryFormatParser } from "../types";
 import { allMacros, allMacroEnums } from "./macros";
 import { generateCompletions } from "./sugarcube-completions";
 import { generateDiagnostics } from "./sugarcube-diagnostics";

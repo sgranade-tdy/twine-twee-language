@@ -8,7 +8,7 @@ import { DiagnosticCodes } from "@tt3/shared";
 import { createDiagnosticFromRange } from "../../diagnostics";
 import { isBuiltinJSProperty } from "../../js-parser";
 import { ProjectIndex } from "../../project-index";
-import { referencesToDiagnostics } from "../../validator";
+import { referencesToDiagnostics } from "../../reference-diagnostics";
 import { allBuiltInMacros, allMacros } from "./macros";
 import { getSugarCubeDefinitions } from "./sugarcube-parser";
 import { builtinVars, builtInVarsAndProperties } from "./sugarcube-variables";

@@ -3,7 +3,11 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 
 import { DecorationRange, DiagnosticCode, DiagnosticMap } from "@tt3/shared";
 import { EmbeddedDocument } from "../embedded-languages";
-import { ParseLevel, ParserCallbacks, ParsingState } from "../parser";
+import {
+    ParseLevel,
+    ParserCallbacks,
+    ParsingState,
+} from "../passage-text-parsers/types";
 import { Label, Passage, ProjSymbol, StoryData } from "../project-index";
 import { SemanticToken } from "../semantic-tokens";
 

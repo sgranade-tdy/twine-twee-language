@@ -1,8 +1,4 @@
-import {
-    DiagnosticSeverity,
-    Location,
-    Range,
-} from "vscode-languageserver";
+import { DiagnosticSeverity, Location, Range } from "vscode-languageserver";
 import type { TextDocument } from "vscode-languageserver-textdocument";
 
 import {

@@ -8,7 +8,10 @@ import {
     tokenizeJavaScript,
 } from "../../../js-parser";
 import { createLocationFor } from "../../../parser";
-import { capturePreSemanticTokenFor, StoryFormatParsingState } from "../..";
+import {
+    capturePreSemanticTokenFor,
+    StoryFormatParsingState,
+} from "../../types";
 import {
     browserGlobals,
     collisionProneBrowserGlobals,

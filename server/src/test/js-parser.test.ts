@@ -4,7 +4,7 @@ import { Location, Range } from "vscode-languageserver";
 
 import { buildParsingState, MockCallbacks } from "./builders";
 import { ETokenType } from "../semantic-tokens";
-import { StoryFormatParsingState } from "../passage-text-parsers";
+import { StoryFormatParsingState } from "../passage-text-parsers/types";
 import { browserGlobals } from "../passage-text-parsers/host-globals";
 import { sugarCubeExcludedGlobals } from "../passage-text-parsers/sugarcube/sc2/sc2-twinescript";
 import * as uut from "../js-parser";

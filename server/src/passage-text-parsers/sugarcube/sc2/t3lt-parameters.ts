@@ -5,7 +5,7 @@
 
 import { Range } from "vscode-languageserver";
 
-import { ParsingState } from "../../../parser";
+import { ParsingState } from "../../types";
 import { SugarCubeParsingState } from "../sugarcube-parser";
 import {
     ArgumentToken,

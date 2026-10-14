@@ -14,8 +14,6 @@ import {
     tokenizeJavaScript,
 } from "../../js-parser";
 import {
-    ParseLevel,
-    ParsingState,
     createLocationFor,
     createSymbolFor,
     findAndParseHtml,
@@ -26,6 +24,7 @@ import {
     logSemanticTokenFor,
     parsePassageReference,
 } from "../../parser";
+import { ParseLevel, ParsingState } from "../types";
 import { calleeFlag, ProjectIndex } from "../../project-index";
 import { ETokenType, ETokenModifier } from "../../semantic-tokens";
 import { Token } from "../../types";
@@ -35,7 +34,7 @@ import {
     skipSpaces,
     versionCompare,
 } from "../../utilities";
-import { StoryFormatParsingState, capturePreSemanticTokenFor } from "..";
+import { StoryFormatParsingState, capturePreSemanticTokenFor } from "../types";
 import { browserGlobals } from "../host-globals";
 import { ChapbookParserAPI } from ".";
 import {

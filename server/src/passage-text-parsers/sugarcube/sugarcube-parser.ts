@@ -1,13 +1,11 @@
 import { Range } from "vscode-languageserver";
 
 import { DiagnosticCodes } from "@tt3/shared";
-import { capturePreSemanticTokenFor, StoryFormatParsingState } from "..";
+import { capturePreSemanticTokenFor, StoryFormatParsingState } from "../types";
 import { createDiagnosticFromRange } from "../../diagnostics";
 import { EmbeddedDocument } from "../../embedded-languages";
 import { tokenizeJavaScript } from "../../js-parser";
 import {
-    ParseLevel,
-    ParsingState,
     createSymbolFor,
     findAndParseHtml,
     logDiagnosticFor,
@@ -15,6 +13,7 @@ import {
     logSemanticTokenFor,
     parsePassageReference,
 } from "../../parser";
+import { ParseLevel, ParsingState } from "../types";
 import { ProjectIndex, ProjSymbol } from "../../project-index";
 import { ETokenModifier, ETokenType } from "../../semantic-tokens";
 import { eraseMatches, versionCompare } from "../../utilities";

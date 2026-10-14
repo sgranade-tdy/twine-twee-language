@@ -9,7 +9,8 @@ import {
 } from "@tt3/shared";
 import { createDiagnosticFromRange } from "./diagnostics";
 import { EmbeddedDocument } from "./embedded-languages";
-import { ParseLevel, ParserCallbacks, parse } from "./parser";
+import { parse } from "./parser";
+import { ParseLevel, ParserCallbacks } from "./passage-text-parsers/types";
 import { getStoryFormatParser } from "./passage-text-parsers";
 import {
     Passage,
