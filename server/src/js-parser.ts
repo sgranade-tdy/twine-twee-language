@@ -1,12 +1,14 @@
 import * as acorn from "acorn";
 import * as acornLoose from "acorn-loose";
 import * as acornWalk from "acorn-walk";
+import * as eslintScope from "eslint-scope";
+import type * as ESTree from "estree";
 import { DiagnosticSeverity } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
 import { improveAcornErrorMessage } from "./acorn-errors";
 import { ParserWithState } from "./acorn-errors/parser-state";
-import { EcmaVersion } from "./ecma-version";
+import { EcmaVersion, ScopeEcmaVersion } from "./ecma-version";
 import { createLocationFor } from "./parser";
 import {
     StoryFormatParsingState,
@@ -211,167 +213,14 @@ const builtInJSObjectInstanceProperties = new Set([
     "disposed", // DisposableStack, AsyncDisposableStack
 ]);
 
-/**
- * Scope in which identifiers will be found and bound.
- */
-interface Scope {
-    type: "global" | "function" | "block";
-    parent?: Scope;
-    bindings: Set<string>;
-}
+type ScopeType = "global" | "function" | "block";
 
 /**
  * Add scope information to an Acorn identifier.
  */
 interface ScopedIdentifier extends acorn.Identifier {
     _isAssignment?: boolean;
-    _scopeType?: "global" | "function" | "block";
-}
-
-/**
- * Create a scope.
- *
- * @param type Type of scope to create.
- * @param parent The new scope's parent, if any.
- */
-function createScope(type: Scope["type"], parent?: Scope): Scope {
-    return {
-        type,
-        parent,
-        bindings: new Set(),
-    };
-}
-
-/**
- * Get the function (or global) scope that contains a block.
- */
-function nearestFunctionScope(scope: Scope): Scope {
-    let current = scope;
-
-    while (current.type === "block") {
-        current = current.parent!; // Blocks should always have parents
-    }
-
-    return current;
-}
-
-/**
- * Bind a declared identifier.
- *
- * @param scope Scope in which to declare the binding.
- * @param name Identifier name.
- * @param kind Kind of binding.
- * @returns Scope to which the identifier was bound.
- */
-function bindIdentifier(
-    scope: Scope,
-    name: string,
-    kind:
-        | "var"
-        | "let"
-        | "const"
-        | "param"
-        | "function"
-        | "class"
-        | "using"
-        | "await using",
-): Scope {
-    const target = kind === "var" ? nearestFunctionScope(scope) : scope;
-
-    target.bindings.add(name);
-
-    return target;
-}
-
-/**
- * Bind a declaration's name and mark the identifier as a definition in the
- * scope it bound to.
- *
- * @param scope Scope in which to declare the binding.
- * @param id Identifier being declared.
- * @param kind Kind of binding.
- */
-function bindDeclaredName(
-    scope: Scope,
-    id: acorn.Identifier,
-    kind: Parameters<typeof bindIdentifier>[2],
-): void {
-    const boundScope = bindIdentifier(scope, id.name, kind);
-    (id as ScopedIdentifier)._isAssignment = true;
-    (id as ScopedIdentifier)._scopeType = boundScope.type;
-}
-
-/**
- * Find the scope to which an identifier is bound.
- *
- * @param scope Scope to start with.
- * @param name Identifier to find.
- * @returns Scope to which the identifier is bound, or undefined if none.
- */
-function findBindingScope(scope: Scope, name: string): Scope | undefined {
-    let current: Scope | undefined = scope;
-
-    while (current) {
-        if (current.bindings.has(name)) {
-            return current;
-        }
-
-        current = current.parent;
-    }
-
-    return undefined;
-}
-
-/**
- * Collect identifiers from patterns such as destructuring and function params.
- *
- * @param pattern Pattern to collect identifiers from.
- * @param callback Visitor function to call when an identifier is found.
- */
-function collectPatternIdentifiers(
-    pattern: acorn.AnyNode,
-    callback: (id: acorn.Identifier) => void,
-): void {
-    switch (pattern.type) {
-        case "Identifier":
-            callback(pattern as ScopedIdentifier);
-            break;
-
-        case "ObjectPattern":
-            for (const prop of pattern.properties) {
-                if (prop.type === "Property") {
-                    collectPatternIdentifiers(
-                        prop.value as acorn.AnyNode,
-                        callback,
-                    );
-                } else {
-                    collectPatternIdentifiers(
-                        prop.argument as acorn.AnyNode,
-                        callback,
-                    );
-                }
-            }
-            break;
-
-        case "ArrayPattern":
-            for (const element of pattern.elements) {
-                if (element) {
-                    collectPatternIdentifiers(
-                        element as acorn.AnyNode,
-                        callback,
-                    );
-                }
-            }
-            break;
-
-        case "AssignmentPattern":
-            collectPatternIdentifiers(pattern.left, callback);
-            break;
-
-        case "RestElement":
-            collectPatternIdentifiers(pattern.argument, callback);
-            break;
-    }
+    _scopeType?: ScopeType;
 }
 
 /**
@@ -473,286 +322,135 @@ function classifyIdentifier(
 }
 
 /**
+ * Is a reference a write, given the caller's assignment context?
+ *
+ * A declaration's initializer always writes. Any other write-shaped syntax
+ * (`a = 1`, `a++`, `[a] = b`, `for (a of b)`) writes only in an assignment
+ * context, since elsewhere it's more often a `==` typo or a side effect.
+ *
+ * @param ref eslint-scope reference to the identifier.
+ * @param isAssignmentContext True if write-shaped syntax counts as an assignment.
+ */
+function isWriteReference(
+    ref: eslintScope.Reference,
+    isAssignmentContext: boolean,
+): boolean {
+    return ref.init === true || (isAssignmentContext && ref.isWrite());
+}
+
+/**
+ * Does the top level of a program use `import` or `export`?
+ */
+function hasModuleSyntax(program: ESTree.Program): boolean {
+    return program.body.some((node) => /^(Import|Export)/.test(node.type));
+}
+
+/**
+ * Get a `Program` for eslint-scope to analyze. An expression parse has no
+ * `Program` root, so it's wrapped in one.
+ */
+function toProgram(ast: acorn.Node): ESTree.Program {
+    if (ast.type === "Program") return ast as unknown as ESTree.Program;
+    const range: [number, number] = [ast.start, ast.end];
+    return {
+        type: "Program",
+        sourceType: "script",
+        start: ast.start,
+        end: ast.end,
+        range,
+        body: [
+            {
+                type: "ExpressionStatement",
+                start: ast.start,
+                end: ast.end,
+                range,
+                expression: ast,
+            },
+        ],
+    } as unknown as ESTree.Program;
+}
+
+/**
  * Annotate variable definitions or references along with their scope.
  *
- * References are resolved only after the whole AST has been walked, so every
- * declaration is visible throughout its scope regardless of where it appears
- * (hoisting). That's JS semantics for `var` and `function`; for `let`,
- * `const` and `class` a reference before the declaration either sits in a
- * closure (legal) or throws at runtime, so treating the name as bound loses
- * nothing.
+ * Scope resolution comes from eslint-scope (see ADR-0004). A reference counts
+ * as being in the "global" scope, i.e. a story variable, if nothing resolves
+ * it or it resolves to a root-level declaration (global or module scope).
  *
  * @param ast AST to annotate.
  * @param isAssignmentContext True if write-shaped syntax counts as an assignment.
  */
-function annotateVariableScopes(
-    ast: acorn.Node,
-    isAssignmentContext: boolean,
-) {
-    const globalScope = createScope("global");
-    const references: { id: ScopedIdentifier; scope: Scope }[] = [];
+function annotateVariableScopes(ast: acorn.Node, isAssignmentContext: boolean) {
+    const program = toProgram(ast);
+    const scopeManager = eslintScope.analyze(program, {
+        ecmaVersion: ScopeEcmaVersion,
+        sourceType: hasModuleSyntax(program) ? "module" : "script",
+        optimistic: true,
+    });
 
-    /**
-     * Visit a function: its parameters bind in one scope, and its body's
-     * declarations (including hoisted `var`s) in a child of that scope, so
-     * parameter defaults can't see body `var`s. A named function
-     * expression's name binds in a scope of its own outside both.
-     *
-     * @param node Function to visit.
-     * @param scope Scope enclosing the function.
-     * @param ancestors Function's ancestors, ending with `node` itself.
-     */
-    function visitFunction(
-        node:
-            | acorn.FunctionDeclaration
-            | acorn.AnonymousFunctionDeclaration
-            | acorn.FunctionExpression
-            | acorn.ArrowFunctionExpression,
-        scope: Scope,
-        ancestors: acorn.Node[],
-    ): void {
-        let outerScope = scope;
-        if (node.id) {
-            if (node.type === "FunctionDeclaration") {
-                bindDeclaredName(scope, node.id, "function");
-            } else {
-                outerScope = createScope("block", scope);
-                bindDeclaredName(outerScope, node.id, "function");
+    const scopeTypeOf = (scope: eslintScope.Scope): ScopeType =>
+        scope.type === "global" || scope.type === "module"
+            ? "global"
+            : scope.type === "function"
+              ? "function"
+              : "block";
+
+    for (const scope of scopeManager.scopes) {
+        for (const ref of scope.references) {
+            const id = ref.identifier as unknown as ScopedIdentifier;
+            id._isAssignment = isWriteReference(ref, isAssignmentContext);
+
+            let variable = ref.resolved;
+            // A class's name inside its own body resolves to an inner
+            // binding. Redirect to the outer variable the class declares.
+            if (variable?.scope.type === "class") {
+                const def = variable.defs[0];
+                variable =
+                    def?.node.type === "ClassDeclaration"
+                        ? findOuterClassVariable(variable)
+                        : variable;
             }
-        }
-
-        const paramScope = createScope("function", outerScope);
-        if (node.type !== "ArrowFunctionExpression") {
-            bindIdentifier(paramScope, "arguments", "param");
-        }
-        for (const param of node.params) {
-            collectPatternIdentifiers(param as acorn.AnyNode, (id) => {
-                bindIdentifier(paramScope, id.name, "param");
-            });
-        }
-
-        if (node.body.type === "BlockStatement") {
-            const bodyScope = createScope("function", paramScope);
-            for (const child of node.body.body)
-                visit(child, bodyScope, [...ancestors, node.body, child]);
-        } else {
-            visit(node.body, paramScope, [...ancestors, node.body]);
+            id._scopeType = variable ? scopeTypeOf(variable.scope) : "global";
         }
     }
 
-    /**
-     * Visit the expressions embedded in a binding pattern -- default values
-     * and computed keys -- without re-visiting the names it binds.
-     *
-     * @param pattern Pattern to walk.
-     * @param scope Scope the embedded expressions are evaluated in.
-     * @param ancestors Pattern's ancestors, ending with `pattern` itself.
-     */
-    function visitPatternExpressions(
-        pattern: acorn.AnyNode,
-        scope: Scope,
-        ancestors: acorn.Node[],
-    ): void {
-        const into = (child: acorn.AnyNode, path: acorn.Node[]) =>
-            visitPatternExpressions(child, scope, [...ancestors, ...path]);
-
-        switch (pattern.type) {
-            case "ObjectPattern":
-                for (const prop of pattern.properties) {
-                    if (prop.type === "Property") {
-                        if (prop.computed)
-                            visit(prop.key, scope, [
-                                ...ancestors,
-                                prop,
-                                prop.key,
-                            ]);
-                        into(prop.value, [prop, prop.value]);
-                    } else {
-                        into(prop, [prop]);
-                    }
+    // Root-level declarations are assignments, whether or not they have an
+    // initializer (and so a write reference).
+    const rootScopes = scopeManager.scopes.filter(
+        (scope) => scope.type === "global" || scope.type === "module",
+    );
+    for (const scope of rootScopes) {
+        for (const variable of scope.variables) {
+            for (const def of variable.defs) {
+                if (
+                    def.type === "Variable" ||
+                    def.type === "FunctionName" ||
+                    def.type === "ClassName"
+                ) {
+                    const id = def.name as unknown as ScopedIdentifier;
+                    id._isAssignment = true;
+                    id._scopeType = "global";
                 }
-                break;
-
-            case "ArrayPattern":
-                for (const element of pattern.elements) {
-                    if (element) into(element, [element]);
-                }
-                break;
-
-            case "AssignmentPattern":
-                into(pattern.left, [pattern.left]);
-                visit(pattern.right, scope, [...ancestors, pattern.right]);
-                break;
-
-            case "RestElement":
-                into(pattern.argument, [pattern.argument]);
-                break;
-        }
-    }
-
-    function visit(node: acorn.AnyNode, scope: Scope, ancestors: acorn.Node[]) {
-        switch (node.type) {
-            case "Program":
-            case "BlockStatement": {
-                const newScope =
-                    node.type === "BlockStatement"
-                        ? createScope("block", scope)
-                        : scope;
-                for (const child of node.body)
-                    visit(child, newScope, [...ancestors, child]);
-                return;
-            }
-
-            case "FunctionDeclaration":
-            case "FunctionExpression":
-            case "ArrowFunctionExpression":
-                visitFunction(node, scope, ancestors);
-                return;
-
-            case "StaticBlock": {
-                // A static block is a function-like scope: even `var` stays inside.
-                const blockScope = createScope("function", scope);
-                for (const child of node.body)
-                    visit(child, blockScope, [...ancestors, child]);
-                return;
-            }
-
-            case "SwitchStatement": {
-                // All `case` bodies share one block scope; the discriminant
-                // is evaluated outside it.
-                visit(node.discriminant, scope, [
-                    ...ancestors,
-                    node.discriminant,
-                ]);
-                const caseScope = createScope("block", scope);
-                for (const switchCase of node.cases)
-                    visit(switchCase, caseScope, [...ancestors, switchCase]);
-                return;
-            }
-
-            case "VariableDeclaration": {
-                for (const decl of node.declarations) {
-                    collectPatternIdentifiers(decl.id as acorn.AnyNode, (id) =>
-                        bindDeclaredName(scope, id, node.kind),
-                    );
-                    if (decl.init)
-                        visit(decl.init, scope, [...ancestors, decl.init]);
-                }
-                return;
-            }
-
-            case "ForStatement": {
-                // The loop head gets its own scope: `let`/`const` bind
-                // per-iteration there, while `var` still hoists out to the
-                // nearest function scope via `bindIdentifier`.
-                const loopScope = createScope("block", scope);
-                if (node.init)
-                    visit(node.init, loopScope, [...ancestors, node.init]);
-                if (node.test)
-                    visit(node.test, loopScope, [...ancestors, node.test]);
-                if (node.update)
-                    visit(node.update, loopScope, [...ancestors, node.update]);
-                visit(node.body, loopScope, [...ancestors, node.body]);
-                return;
-            }
-
-            case "ForOfStatement":
-            case "ForInStatement": {
-                // Same reasoning as ForStatement: the loop head (`left`) is
-                // its own scope. `left` may be a VariableDeclaration (bound
-                // here) or an existing reference (e.g. `for (a of b)`).
-                const loopScope = createScope("block", scope);
-                visit(node.left, loopScope, [...ancestors, node.left]);
-                visit(node.right, loopScope, [...ancestors, node.right]);
-                visit(node.body, loopScope, [...ancestors, node.body]);
-                return;
-            }
-
-            case "CatchClause": {
-                const catchScope = createScope("block", scope);
-                if (node.param) {
-                    // The param is a pattern -- `catch ({message})` is legal.
-                    collectPatternIdentifiers(
-                        node.param as acorn.AnyNode,
-                        (id) => {
-                            bindIdentifier(catchScope, id.name, "param");
-                        },
-                    );
-                    // Default values and computed keys inside the pattern
-                    // are ordinary expressions that still need resolving.
-                    visitPatternExpressions(node.param, catchScope, [
-                        ...ancestors,
-                        node.param,
-                    ]);
-                }
-                visit(node.body, catchScope, [...ancestors, node.body]);
-                return;
-            }
-
-            case "ClassDeclaration":
-            case "ClassExpression": {
-                // A class declaration's name binds in the enclosing scope,
-                // but a class expression's name is only visible inside its
-                // own body.
-                let bodyScope = scope;
-                if (node.id) {
-                    if (node.type === "ClassExpression")
-                        bodyScope = createScope("block", scope);
-                    bindDeclaredName(bodyScope, node.id, "class");
-                }
-                if (node.superClass)
-                    visit(node.superClass, scope, [
-                        ...ancestors,
-                        node.superClass,
-                    ]);
-                visit(node.body, bodyScope, [...ancestors, node.body]);
-                return;
-            }
-
-            case "Identifier": {
-                const idNode = node as ScopedIdentifier;
-                if (classifyIdentifier(node, ancestors) !== "reference") break;
-
-                // The identifier is a reference, resolved once every scope's
-                // bindings are complete...
-                idNode._isAssignment = false;
-                references.push({ id: idNode, scope });
-
-                // ...unless it's the LHS of an assignment in an assignment context.
-                if (isAssignmentContext) {
-                    const parent = parentOf(ancestors);
-                    if (
-                        parent &&
-                        parent.type === "AssignmentExpression" &&
-                        parent.left === node
-                    ) {
-                        idNode._isAssignment = true;
-                    }
-                }
-                break;
-            }
-        }
-
-        // Recursively visit all children
-        for (const key in node) {
-            const child = (node as any)[key];
-            if (!child || typeof child !== "object") continue;
-            if (Array.isArray(child)) {
-                for (const c of child) {
-                    if (c && typeof c === "object" && "type" in c)
-                        visit(c as acorn.AnyNode, scope, [...ancestors, c]);
-                }
-            } else if ("type" in child) {
-                visit(child as acorn.AnyNode, scope, [...ancestors, child]);
             }
         }
     }
+}
 
-    visit(ast as acorn.AnyNode, globalScope, [ast as acorn.AnyNode]);
-
-    for (const { id, scope } of references) {
-        id._scopeType = findBindingScope(scope, id.name)?.type ?? "global";
+/**
+ * Find the outer variable that a class declaration's inner self-binding stands for.
+ */
+function findOuterClassVariable(
+    inner: eslintScope.Variable,
+): eslintScope.Variable | null {
+    for (
+        let scope: eslintScope.Scope | null = inner.scope.upper;
+        scope;
+        scope = scope.upper
+    ) {
+        const outer = scope.set.get(inner.name);
+        if (outer) return outer;
     }
+    return null;
 }
 
 /**
@@ -1526,11 +1224,13 @@ export function parseJSStrict(text: string, isProgram: boolean): acorn.Node {
         return ParserWithState.parse(text, {
             ecmaVersion: EcmaVersion,
             sourceType: "script",
+            ranges: true,
         });
     } else {
         return ParserWithState.parseExpressionAt(text, 0, {
             ecmaVersion: EcmaVersion,
             sourceType: "script",
+            ranges: true,
         });
     }
 }
@@ -1582,6 +1282,7 @@ export function parseJS(
     return [
         acornLoose.parse(text, {
             ecmaVersion: EcmaVersion,
+            ranges: true,
         }),
         diagnostic,
     ];
