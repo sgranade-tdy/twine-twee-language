@@ -162,11 +162,9 @@ describe("SugarCube Completions", () => {
             const index = new Index();
             const macro = buildMacroInfo({ name: "testy" });
             const parser = uut.getSugarCubeParser(undefined, {
+                allMacroEnums: () => ({}),
                 allMacros: () => {
                     return { testy: macro };
-                },
-                allBuiltInMacros: () => {
-                    return {};
                 },
             });
 
@@ -203,10 +201,8 @@ describe("SugarCube Completions", () => {
                 },
             ]);
             const parser = uut.getSugarCubeParser(undefined, {
+                allMacroEnums: () => ({}),
                 allMacros: () => {
-                    return {};
-                },
-                allBuiltInMacros: () => {
                     return {};
                 },
             });
@@ -245,11 +241,9 @@ describe("SugarCube Completions", () => {
             ]);
             const macro = buildMacroInfo({ name: "testy" });
             const parser = uut.getSugarCubeParser(undefined, {
+                allMacroEnums: () => ({}),
                 allMacros: () => {
                     return { testy: macro };
-                },
-                allBuiltInMacros: () => {
-                    return {};
                 },
             });
 
@@ -278,11 +272,9 @@ describe("SugarCube Completions", () => {
             const index = new Index();
             const macro = buildMacroInfo({ name: "testy" });
             const parser = uut.getSugarCubeParser(undefined, {
+                allMacroEnums: () => ({}),
                 allMacros: () => {
                     return { testy: macro };
-                },
-                allBuiltInMacros: () => {
-                    return {};
                 },
             });
 
@@ -311,11 +303,9 @@ describe("SugarCube Completions", () => {
             const macro = buildMacroInfo({ name: "testy", container: true });
             macro.arguments = undefined;
             const parser = uut.getSugarCubeParser(undefined, {
+                allMacroEnums: () => ({}),
                 allMacros: () => {
                     return { testy: macro };
-                },
-                allBuiltInMacros: () => {
-                    return {};
                 },
             });
 
@@ -350,11 +340,9 @@ describe("SugarCube Completions", () => {
             const macro = buildMacroInfo({ name: "testy", container: true });
             macro.arguments = true;
             const parser = uut.getSugarCubeParser(undefined, {
+                allMacroEnums: () => ({}),
                 allMacros: () => {
                     return { testy: macro };
-                },
-                allBuiltInMacros: () => {
-                    return {};
                 },
             });
 
@@ -389,11 +377,9 @@ describe("SugarCube Completions", () => {
             const macro = buildMacroInfo({ name: "testy", container: true });
             macro.arguments = ["text"];
             const parser = uut.getSugarCubeParser(undefined, {
+                allMacroEnums: () => ({}),
                 allMacros: () => {
                     return { testy: macro };
-                },
-                allBuiltInMacros: () => {
-                    return {};
                 },
             });
 
@@ -428,11 +414,9 @@ describe("SugarCube Completions", () => {
             const macro = buildMacroInfo({ name: "testy", container: true });
             macro.arguments = false;
             const parser = uut.getSugarCubeParser(undefined, {
+                allMacroEnums: () => ({}),
                 allMacros: () => {
                     return { testy: macro };
-                },
-                allBuiltInMacros: () => {
-                    return {};
                 },
             });
 
@@ -464,11 +448,9 @@ describe("SugarCube Completions", () => {
             const macro = buildMacroInfo({ name: "testy", container: true });
             macro.arguments = undefined;
             const parser = uut.getSugarCubeParser(undefined, {
+                allMacroEnums: () => ({}),
                 allMacros: () => {
                     return { testy: macro };
-                },
-                allBuiltInMacros: () => {
-                    return {};
                 },
             });
 
@@ -500,11 +482,9 @@ describe("SugarCube Completions", () => {
             const macro = buildMacroInfo({ name: "testy", container: true });
             macro.arguments = false;
             const parser = uut.getSugarCubeParser(undefined, {
+                allMacroEnums: () => ({}),
                 allMacros: () => {
                     return { testy: macro };
-                },
-                allBuiltInMacros: () => {
-                    return {};
                 },
             });
 
@@ -532,11 +512,9 @@ describe("SugarCube Completions", () => {
             const index = new Index();
             const macro = buildMacroInfo({ name: "testy", container: true });
             const parser = uut.getSugarCubeParser(undefined, {
+                allMacroEnums: () => ({}),
                 allMacros: () => {
                     return { testy: macro };
-                },
-                allBuiltInMacros: () => {
-                    return {};
                 },
             });
 
