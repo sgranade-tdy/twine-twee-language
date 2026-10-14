@@ -613,7 +613,7 @@ describe("JS Parser", () => {
                 offset,
                 state.textDocument,
                 storyState,
-                true, // Force assignment to be definition
+                { isAssignmentContext: true }, // Force assignment to be definition
             );
 
             expect(result.variables).to.eql([
@@ -770,7 +770,7 @@ describe("JS Parser", () => {
                 offset,
                 state.textDocument,
                 storyState,
-                true,
+                { isAssignmentContext: true },
             ).properties;
 
             expect(result).to.eql([
@@ -833,7 +833,7 @@ describe("JS Parser", () => {
                 offset,
                 state.textDocument,
                 storyState,
-                true,
+                { isAssignmentContext: true },
             ).properties;
 
             expect(result).to.eql([
@@ -1328,7 +1328,7 @@ describe("JS Parser", () => {
                 offset,
                 state.textDocument,
                 storyState,
-                true,
+                { isAssignmentContext: true },
             );
 
             expect(result.variables).to.eql([
@@ -2839,7 +2839,7 @@ describe("JS Parser", () => {
                     0,
                     state.textDocument,
                     storyState,
-                    isAssignmentContext,
+                    { isAssignmentContext },
                 );
 
                 const actual = compact(result);
@@ -2881,7 +2881,7 @@ describe("JS Parser", () => {
                 0,
                 state.textDocument,
                 { passageTokens: {} },
-                flag,
+                { isAssignmentContext: flag },
             );
             return member
                 ? result.properties.find((p) => p.contents === "x")?.assigned

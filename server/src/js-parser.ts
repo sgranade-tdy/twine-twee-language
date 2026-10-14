@@ -1390,7 +1390,8 @@ export function parseJS(
  * @param offset Offset into the document where the expression occurs.
  * @param document Document containing the expression.
  * @param storyFormatState Story format parsing state that will collect semantic tokens, and that supplies the format's host globals.
- * @param isAssignmentContext True if the code comes from a construct whose purpose is to set state (an assignment context), so write-shaped syntax counts as an assignment. Otherwise such writes are reported as reads, since outside an assignment context they're more often a `==` typo or a side effect. Declarations are assignments either way.
+ * @param options Tokenizing options.
+ * @param options.isAssignmentContext True if the code comes from a construct whose purpose is to set state (an assignment context), so write-shaped syntax counts as an assignment. Otherwise such writes are reported as reads, since outside an assignment context they're more often a `==` typo or a side effect. Declarations are assignments either way.
  * @returns Tokenized variables and properties and any parsing error.
  */
 export function tokenizeJavaScript(
@@ -1399,7 +1400,7 @@ export function tokenizeJavaScript(
     offset: number,
     document: TextDocument,
     storyFormatState: StoryFormatParsingState,
-    isAssignmentContext?: boolean,
+    { isAssignmentContext = false }: { isAssignmentContext?: boolean } = {},
 ): TokenizedJS {
     const tokenized: TokenizedJS = {
         variables: [],
@@ -1409,7 +1410,7 @@ export function tokenizeJavaScript(
     const [ast, diagnostic] = parseJS(text, isProgram, offset);
     tokenized.error = diagnostic;
     if (ast !== undefined) {
-        annotateVariableScopes(ast, !!isAssignmentContext);
+        annotateVariableScopes(ast, isAssignmentContext);
         const isGlobalName = globalNamePredicate(storyFormatState.hostGlobals);
 
         // Highlighting pass: every token, no scope.
@@ -1428,7 +1429,7 @@ export function tokenizeJavaScript(
         const { variables, properties } = extractSymbols(
             ast,
             isGlobalName,
-            !!isAssignmentContext,
+            isAssignmentContext,
         );
         for (const variable of variables) {
             tokenized.variables.push({
