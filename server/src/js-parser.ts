@@ -609,11 +609,23 @@ export function isBuiltinJSProperty(
 }
 
 /**
+ * A JavaScript identifier name. Reserved words count: `obj.class` is valid.
+ */
+const identifierNameRegexp =
+    /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u;
+
+/**
  * Get the static name of a node that is a property.
+ *
+ * A string literal key (`obj['k']`, `{'k': 1}`) has a static name only if it's
+ * written as a plain identifier name, so the property's path can be spelled
+ * with dots and its label range matches the source text. Numeric keys and
+ * other strings (`'a.b'`, `'my key'`, `'1'`, `'\u0061'`) are treated as
+ * dynamic.
  *
  * @param property Node that contains the property.
  * @param computed Whether the property is a computed one.
- * @returns The static property name, or undefined if the property is computed and non-static.
+ * @returns The static property name, or undefined if the property has none.
  */
 function getStaticPropertyName(
     property: acorn.AnyNode,
@@ -624,12 +636,13 @@ function getStaticPropertyName(
         return property.name !== MISSING_IDENTIFIER ? property.name : undefined;
     }
 
-    // A computed key can only be a string literal here; a non-computed literal
-    // key (`{'k': 1}`, `{1: 'x'}`) can be a string or a number.
-    if (property.type === "Literal") {
-        if (typeof property.value === "string") return property.value;
-        if (!computed && typeof property.value === "number")
-            return property.raw ?? String(property.value); // The source text, so the range matches
+    if (
+        property.type === "Literal" &&
+        typeof property.value === "string" &&
+        identifierNameRegexp.test(property.value) &&
+        property.raw?.slice(1, -1) === property.value
+    ) {
+        return property.value;
     }
 
     return undefined;
