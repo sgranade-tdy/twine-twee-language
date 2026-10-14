@@ -8,7 +8,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 
 import { improveAcornErrorMessage } from "./acorn-errors";
 import { ParserWithState } from "./acorn-errors/parser-state";
-import { EcmaVersion, ScopeEcmaVersion } from "./ecma-version";
+import { ParseEcmaVersion, ScopeEcmaVersion } from "./ecma-version";
 import { createLocationFor } from "./parser";
 import {
     StoryFormatParsingState,
@@ -1220,13 +1220,13 @@ export function parseJSStrict(text: string, isProgram: boolean): acorn.Node {
     // out of any thrown SyntaxError.
     if (isProgram) {
         return ParserWithState.parse(text, {
-            ecmaVersion: EcmaVersion,
+            ecmaVersion: ParseEcmaVersion,
             sourceType: "script",
             ranges: true,
         });
     } else {
         return ParserWithState.parseExpressionAt(text, 0, {
-            ecmaVersion: EcmaVersion,
+            ecmaVersion: ParseEcmaVersion,
             sourceType: "script",
             ranges: true,
         });
@@ -1279,7 +1279,7 @@ export function parseJS(
     // Finally try whatever parsing we can get away with
     return [
         acornLoose.parse(text, {
-            ecmaVersion: EcmaVersion,
+            ecmaVersion: ParseEcmaVersion,
             ranges: true,
         }),
         diagnostic,
