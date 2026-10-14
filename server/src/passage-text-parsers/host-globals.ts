@@ -7,6 +7,10 @@
 
 /**
  * Browser globals an author is unlikely to pick as a story variable name.
+ *
+ * Chapbook also has `windowGlobals` (`chapbook/window-globals.ts`), a generated,
+ * exhaustive list of truthy names on `window` used only to warn when a story
+ * variable that shares one is set.
  */
 export const browserGlobals: ReadonlySet<string> = new Set([
     "console",

@@ -936,7 +936,7 @@ function logShadowedVariableDiagnostic(
             shadowed.root,
             at,
             state,
-            shadowedVariableMessage(shadowed.root, shadowed.shadowedBy),
+            shadowedVariableMessage(shadowed),
         );
     }
 }
