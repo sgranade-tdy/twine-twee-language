@@ -38,6 +38,10 @@ import {
 import { StoryFormatParsingState, capturePreSemanticTokenFor } from "..";
 import { browserGlobals } from "../host-globals";
 import { ChapbookParserAPI } from ".";
+import {
+    findShadowedVariable,
+    shadowedVariableMessage,
+} from "./chapbook-shadowing";
 import { InsertTokens, ModifierTokens } from "./inserts";
 import {
     ArgumentRequirement,
@@ -912,6 +916,32 @@ function findAndParseEngineExtensions(
 }
 
 /**
+ * Warn if a variable being set has a name that shadows it in JavaScript contexts.
+ *
+ * Only the first segment of a dotted name is checked and underlined.
+ *
+ * @param name Raw name of the variable being set.
+ * @param at Index of the name in the document (zero-based).
+ * @param state Parsing state.
+ */
+function logShadowedVariableDiagnostic(
+    name: string,
+    at: number,
+    state: ParsingState,
+): void {
+    const shadowed = findShadowedVariable(name);
+    if (shadowed !== undefined) {
+        logDiagnosticFor(
+            DiagnosticCodes.ChapbookVariableShadowedByBrowser,
+            shadowed.root,
+            at,
+            state,
+            shadowedVariableMessage(shadowed.root, shadowed.shadowedBy),
+        );
+    }
+}
+
+/**
  * Find and parse all calls to the Chapbook `engine.state.set()` function.
  *
  * @param contents Contents to search for engine extensions.
@@ -940,6 +970,13 @@ function findAndParseEngineStateSets(
                 1,
             );
             if (varContents) {
+                if (state.parseLevel === ParseLevel.Full) {
+                    logShadowedVariableDiagnostic(
+                        varContents,
+                        ndx + contentsIndex,
+                        state,
+                    );
+                }
                 // Parse the value as a JavaScript expression, but make every var/property a definition
                 const tokens = tokenizeJavaScript(
                     false,
@@ -2235,6 +2272,8 @@ function parseVarsSection(
             );
             name = name.slice(0, spaceMatch.index);
         }
+
+        logShadowedVariableDiagnostic(name, sectionIndex + nameIndex, state);
 
         // Capture the variable name reference as being set by this vars section
         // and update the token for the name to show that it's being modified.
