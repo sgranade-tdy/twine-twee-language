@@ -30,7 +30,12 @@ export interface Label {
 /**
  * A label with a number that identifies the kind of label it is.
  */
-export interface ProjSymbol extends Label, Kind {}
+export interface ProjSymbol extends Label, Kind {
+    /**
+     * For properties, whether the property is the callee of a call or `new`.
+     */
+    isCallee?: boolean;
+}
 
 /**
  * Kind of a Twine symbol.
@@ -47,6 +52,10 @@ export enum TwineSymbolKind {
 export interface References extends Kind {
     contents: string;
     locations: Location[];
+    /**
+     * For property references, true if every location is a call or `new` callee.
+     */
+    isCallee?: boolean;
 }
 
 /**

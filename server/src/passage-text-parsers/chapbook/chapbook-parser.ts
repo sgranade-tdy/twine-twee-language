@@ -154,6 +154,7 @@ function createVariableAndPropertyReferences(
                 isSet || p.assigned
                     ? OChapbookSymbolKind.PropertySet
                     : OChapbookSymbolKind.Property,
+            ...(p.isCallee ? { isCallee: true } : {}),
         });
     }
     if (jsTokens.error) {

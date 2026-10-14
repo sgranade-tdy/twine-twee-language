@@ -2455,6 +2455,7 @@ describe("SugarCube Parser", () => {
                             Range.create(2, 11, 2, 19),
                         ),
                         kind: OSugarCubeSymbolKind.Property,
+                        isCallee: true,
                     },
                 ]);
             });
@@ -2510,6 +2511,7 @@ describe("SugarCube Parser", () => {
                             Range.create(2, 11, 2, 19),
                         ),
                         kind: OSugarCubeSymbolKind.Property,
+                        isCallee: true,
                     },
                 ]);
             });

@@ -94,6 +94,7 @@ export function createVariableAndPropertyReferences(
                     contents: (isTemporary ? "_" : "$") + contents.slice(16),
                     location: p.location,
                     assigned: p.assigned,
+                    ...(p.isCallee ? { isCallee: true } : {}),
                 };
                 const firstPeriodNdx = ref.contents.indexOf(".");
                 if (firstPeriodNdx === -1) {
@@ -133,6 +134,7 @@ export function createVariableAndPropertyReferences(
                     isSet || p.assigned
                         ? OSugarCubeSymbolKind.PropertySet
                         : OSugarCubeSymbolKind.Property,
+                ...(p.isCallee ? { isCallee: true } : {}),
             });
     }
     if (jsTokens.error) {
