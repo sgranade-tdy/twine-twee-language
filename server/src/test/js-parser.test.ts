@@ -1064,7 +1064,7 @@ describe("JS Parser", () => {
             ]);
         });
 
-        it("should not return a called function as a variable", () => {
+        it("should return a called function as a variable", () => {
             const expression = " var1 = funcme();";
             const offset = 12;
             const state = buildParsingState({
@@ -1093,10 +1093,18 @@ describe("JS Parser", () => {
                     ),
                     assigned: false,
                 },
+                {
+                    contents: "funcme",
+                    location: Location.create(
+                        "fake-uri",
+                        Range.create(1, 9, 1, 15),
+                    ),
+                    assigned: false,
+                },
             ]);
         });
 
-        it("should not return a member function called on a variables as a property", () => {
+        it("should return a member function called on a variable as a callee property", () => {
             const expression = " var1 = var2.funcme();";
             const offset = 12;
             const state = buildParsingState({
@@ -1134,7 +1142,46 @@ describe("JS Parser", () => {
                     assigned: false,
                 },
             ]);
-            expect(result.properties).to.be.empty;
+            expect(result.properties).to.eql([
+                {
+                    contents: "funcme",
+                    location: Location.create(
+                        "fake-uri",
+                        Range.create(1, 14, 1, 20),
+                    ),
+                    prefix: "var2",
+                    assigned: false,
+                    isCallee: true,
+                },
+            ]);
+        });
+
+        it("should locate quoted and numeric object-literal keys at their names", () => {
+            const expression = "obj = {'k': 1, 22: 2}";
+            const state = buildParsingState({
+                uri: "fake-uri",
+                content: expression,
+                callbacks: new MockCallbacks(),
+            });
+
+            const result = uut.tokenizeJavaScript(
+                true,
+                expression,
+                0,
+                state.textDocument,
+                { passageTokens: {} },
+            );
+
+            expect(
+                result.properties.map((p) => [
+                    p.contents,
+                    p.location.range.start.character,
+                    p.location.range.end.character,
+                ]),
+            ).to.eql([
+                ["k", 8, 9],
+                ["22", 15, 17],
+            ]);
         });
 
         it("should not return a read/write variable assignment as a created variable", () => {
@@ -1369,7 +1416,8 @@ describe("JS Parser", () => {
                     (p) =>
                         (p.prefix !== undefined ? p.prefix + "." : "") +
                         name(p.contents) +
-                        (p.assigned ? "=" : ""),
+                        (p.assigned ? "=" : "") +
+                        (p.isCallee ? "()" : ""),
                 ),
                 error: result.error?.message,
             };
@@ -1467,7 +1515,7 @@ describe("JS Parser", () => {
                 description: "obj().a",
                 input: "obj().a",
                 isProgram: false,
-                variables: [],
+                variables: ["obj"], // the callee is a read; `.a` is still unspellable
                 properties: [],
             },
             {
@@ -1475,7 +1523,7 @@ describe("JS Parser", () => {
                 input: "obj.a.b().c",
                 isProgram: false,
                 variables: ["obj"],
-                properties: ["obj.a"],
+                properties: ["obj.a", "obj.a.b()"],
             },
 
             // --- Object literals ---
@@ -1517,10 +1565,11 @@ describe("JS Parser", () => {
                 properties: ["obj.a="],
             },
             {
-                description: "obj = {a} // defect 10: missing read of `a`",
+                description:
+                    "obj = {a} // shorthand is both the property and a read",
                 input: "obj = {a}",
                 isProgram: true,
-                variables: ["obj"], // defect 10
+                variables: ["obj", "a"],
                 properties: ["obj.a"],
             },
             {
@@ -1528,7 +1577,7 @@ describe("JS Parser", () => {
                 input: "obj = {a}",
                 isProgram: true,
                 isAssignmentContext: true,
-                variables: ["obj="], // defect 10
+                variables: ["obj=", "a"],
                 properties: ["obj.a="],
             },
             {
@@ -1547,18 +1596,18 @@ describe("JS Parser", () => {
                 properties: ["obj.a="],
             },
             {
-                description: "obj = {'k': 1} // defect 6: string key dropped",
+                description: "obj = {'k': 1}",
                 input: "obj = {'k': 1}",
                 isProgram: true,
                 variables: ["obj"],
-                properties: [], // defect 6
+                properties: ["obj.k"],
             },
             {
-                description: "obj = {1: 'x'} // defect 6: numeric key dropped",
+                description: "obj = {1: 'x'}",
                 input: "obj = {1: 'x'}",
                 isProgram: true,
                 variables: ["obj"],
-                properties: [], // defect 6
+                properties: ["obj.1"],
             },
             {
                 description: "x = {[k]: 1}",
@@ -1641,15 +1690,15 @@ describe("JS Parser", () => {
                     "try{a()}catch(e){e.message} // defect 3, fixed by ticket 03: CatchClause now opens a scope, so `e` binds and `e.message` no longer resolves globally",
                 input: "try{a()}catch(e){e.message}",
                 isProgram: true,
-                variables: [], // defect 3, fixed
-                properties: [], // defect 3, fixed
+                variables: ["a"], // `a` is a callee read
+                properties: [],
             },
             {
                 description:
                     "try{a()}catch({message}){message} // defect 3, fixed by ticket 03: destructured catch params bind too",
                 input: "try{a()}catch({message}){message}",
                 isProgram: true,
-                variables: [],
+                variables: ["a"],
                 properties: [],
             },
             {
@@ -1705,7 +1754,7 @@ describe("JS Parser", () => {
                     "(function(){ on('x', handler); function handler(){} })() // ticket 13: a function declaration is hoisted, so an earlier reference binds to it",
                 input: "(function(){ on('x', handler); function handler(){} })()",
                 isProgram: true,
-                variables: [],
+                variables: ["on"],
                 properties: [],
             },
             {
@@ -1940,10 +1989,123 @@ describe("JS Parser", () => {
             // --- Calls ---
             {
                 description:
+                    "$utils.greet() // a method-call property is a callee occurrence",
+                input: "$utils.greet()",
+                isProgram: true,
+                variables: ["$utils"],
+                properties: ["$utils.greet()"],
+            },
+            {
+                description: "$utils.greet = function(){}, isAssignmentContext",
+                input: "$utils.greet = function(){}",
+                isProgram: true,
+                isAssignmentContext: true,
+                variables: ["$utils"],
+                properties: ["$utils.greet="],
+            },
+            {
+                description:
+                    "$arr.push = f // a non-called method name isn't a callee",
+                input: "$arr.push = f",
+                isProgram: true,
+                variables: ["$arr", "f"],
+                properties: ["$arr.push"],
+            },
+            {
+                description: "y = $arr.push",
+                input: "y = $arr.push",
+                isProgram: true,
+                variables: ["y", "$arr"],
+                properties: ["$arr.push"],
+            },
+            {
+                description: "new $a.B(x)",
+                input: "new $a.B(x)",
+                isProgram: true,
+                variables: ["$a", "x"],
+                properties: ["$a.B()"],
+            },
+            {
+                description:
+                    "throw new TypeError('x') // built-in constructors aren't story variables",
+                input: "throw new TypeError('x')",
+                isProgram: true,
+                variables: [],
+                properties: [],
+            },
+            {
+                description:
+                    "requestAnimationFrame(tick) // host callees aren't story variables",
+                input: "requestAnimationFrame(tick)",
+                isProgram: true,
+                hostGlobals: browserGlobals,
+                variables: ["tick"],
+                properties: [],
+            },
+            {
+                description:
+                    "alert(x) // Chapbook: alert is deliberately a story variable",
+                input: "alert(x)",
+                isProgram: true,
+                hostGlobals: browserGlobals,
+                variables: ["alert", "x"],
+                properties: [],
+            },
+            {
+                description:
+                    "const {a} = o // destructuring shorthand isn't a property",
+                input: "const {a} = o",
+                isProgram: true,
+                variables: ["a=", "o"],
+                properties: [],
+            },
+            {
+                description: "const {a} = o, isAssignmentContext",
+                input: "const {a} = o",
+                isProgram: true,
+                isAssignmentContext: true,
+                variables: ["a=", "o"],
+                properties: [],
+            },
+            {
+                description:
+                    "function f({a}){} // a parameter pattern's shorthand isn't a property",
+                input: "function f({a}){}",
+                isProgram: true,
+                variables: ["f="],
+                properties: [],
+            },
+            {
+                description: "function f({a}){}, isAssignmentContext",
+                input: "function f({a}){}",
+                isProgram: true,
+                isAssignmentContext: true,
+                variables: ["f="],
+                properties: [],
+            },
+            {
+                description:
+                    "({a} = c) // pattern shorthand yields one variable and no property",
+                input: "({a} = c)",
+                isProgram: true,
+                variables: ["a", "c"],
+                properties: [],
+            },
+            {
+                description:
+                    "({a} = c), isAssignmentContext // pattern shorthand yields one variable and no property",
+                input: "({a} = c)",
+                isProgram: true,
+                isAssignmentContext: true,
+                variables: ["a=", "c"],
+                properties: [],
+            },
+            {
+                description:
                     "foo(bar) // defect 1, fixed by ticket 02: call arguments are no longer blanket-excluded, only the callee",
                 input: "foo(bar)",
                 isProgram: true,
-                variables: ["bar"],
+                variables: ["foo", "bar"],
                 properties: [],
             },
             {
@@ -1951,7 +2113,7 @@ describe("JS Parser", () => {
                     "foo(bar.baz) // inconsistent with foo(bar): the member-expression path still yields `bar`",
                 input: "foo(bar.baz)",
                 isProgram: true,
-                variables: ["bar"],
+                variables: ["foo", "bar"],
                 properties: ["bar.baz"],
             },
             {
@@ -1959,7 +2121,7 @@ describe("JS Parser", () => {
                     "a = foo(b) // defect 1, fixed by ticket 02: same as foo(bar)",
                 input: "a = foo(b)",
                 isProgram: true,
-                variables: ["a", "b"],
+                variables: ["a", "foo", "b"],
                 properties: [],
             },
             {
@@ -1967,24 +2129,24 @@ describe("JS Parser", () => {
                     "new Foo(bar) // defect 1, remainder fixed: `new` arguments are no longer excluded, only the callee",
                 input: "new Foo(bar)",
                 isProgram: true,
-                variables: ["bar"],
+                variables: ["Foo", "bar"],
                 properties: [],
             },
             {
                 description:
-                    "new a.B(x) // a member-expression constructor's callee is skipped like a.b(x)'s (ticket 02 review; issue 07 reverses this)",
+                    "new a.B(x) // a member-expression constructor's callee is a callee property like a.b(x)'s",
                 input: "new a.B(x)",
                 isProgram: true,
                 variables: ["a", "x"],
-                properties: [],
+                properties: ["a.B()"],
             },
             {
                 description:
-                    'obj["m"](x) // a string-literal callee is skipped like obj.m(x)\'s (ticket 02; issue 07 reverses this)',
+                    'obj["m"](x) // a string-literal callee is a callee property like obj.m(x)\'s',
                 input: 'obj["m"](x)',
                 isProgram: true,
                 variables: ["obj", "x"],
-                properties: [],
+                properties: ["obj.m()"],
             },
             {
                 description:
@@ -2000,7 +2162,7 @@ describe("JS Parser", () => {
                 input: "obj.method(x)",
                 isProgram: true,
                 variables: ["obj", "x"],
-                properties: [],
+                properties: ["obj.method()"],
             },
             {
                 description:
@@ -2008,7 +2170,7 @@ describe("JS Parser", () => {
                 input: "obj.a.method(x)",
                 isProgram: true,
                 variables: ["obj", "x"],
-                properties: ["obj.a"],
+                properties: ["obj.a", "obj.a.method()"],
             },
             {
                 description:
@@ -2606,7 +2768,7 @@ describe("JS Parser", () => {
             ...(
                 [
                     ["obj.", ["obj"], []],
-                    ["foo(", [], []],
+                    ["foo(", ["foo"], []],
                     ["let = ", ["let"], []],
                     ["for (let i of", [], []],
                     ["class {", [], []],

@@ -2448,6 +2448,14 @@ describe("SugarCube Parser", () => {
                         ),
                         kind: OSugarCubeSymbolKind.Variable,
                     },
+                    {
+                        contents: "$items.includes",
+                        location: Location.create(
+                            "fake-uri",
+                            Range.create(2, 11, 2, 19),
+                        ),
+                        kind: OSugarCubeSymbolKind.Property,
+                    },
                 ]);
             });
 
@@ -2494,6 +2502,14 @@ describe("SugarCube Parser", () => {
                             Range.create(3, 2, 3, 6),
                         ),
                         kind: OSugarCubeSymbolKind.VariableSet,
+                    },
+                    {
+                        contents: "$items.includes",
+                        location: Location.create(
+                            "fake-uri",
+                            Range.create(2, 11, 2, 19),
+                        ),
+                        kind: OSugarCubeSymbolKind.Property,
                     },
                 ]);
             });
@@ -2684,6 +2700,13 @@ describe("SugarCube Parser", () => {
                         char: 62,
                         length: 5,
                         tokenType: ETokenType.variable,
+                        tokenModifiers: [],
+                    },
+                    {
+                        line: 1,
+                        char: 71,
+                        length: 3,
+                        tokenType: ETokenType.property,
                         tokenModifiers: [],
                     },
                     {

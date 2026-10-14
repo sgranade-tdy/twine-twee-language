@@ -116,6 +116,14 @@ export function createVariableAndPropertyReferences(
             }
         }
 
+        // Don't capture properties of the auto-generated variable `output` in a <<script>> macro
+        if (
+            (contents === "output" || contents.startsWith("output.")) &&
+            sugarcubeState.unclosedMacros.find((p) => p.name === "script")
+        ) {
+            continue;
+        }
+
         // Don't save any references to SugarCube-specific properties
         if (!builtInVarsAndProperties.has(contents))
             state.callbacks.onSymbolReference({

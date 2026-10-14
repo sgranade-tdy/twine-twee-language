@@ -49,6 +49,10 @@ export interface JSPropertyLabel extends Label {
      * Whether the property is being assigned to.
      */
     assigned?: boolean;
+    /**
+     * Whether the property is the callee of a call or `new` (`push` in `$arr.push(x)`).
+     */
+    isCallee?: boolean;
 }
 
 export namespace JSPropertyLabel {
@@ -578,15 +582,27 @@ function getStaticPropertyName(
         return property.name !== MISSING_IDENTIFIER ? property.name : undefined;
     }
 
-    if (
-        computed &&
-        property.type === "Literal" &&
-        typeof property.value === "string"
-    ) {
-        return property.value;
+    // A computed key can only be a string literal here; a non-computed literal
+    // key (`{'k': 1}`, `{1: 'x'}`) can be a string or a number.
+    if (property.type === "Literal") {
+        if (typeof property.value === "string") return property.value;
+        if (!computed && typeof property.value === "number")
+            return property.raw ?? String(property.value); // The source text, so the range matches
     }
 
     return undefined;
+}
+
+/**
+ * Get the start of a property key's name, skipping the opening quote of a string literal.
+ *
+ * @param key The property's key node.
+ * @returns Start of the name in the text.
+ */
+function getPropertyNameStart(key: acorn.AnyNode): number {
+    return key.type === "Literal" && typeof key.value === "string"
+        ? key.start + 1
+        : key.start;
 }
 
 /**
@@ -609,12 +625,7 @@ function captureMemberChain(
                 current.property,
                 current.computed,
             );
-            const start =
-                current.computed &&
-                current.property.type === "Literal" &&
-                typeof current.property.value === "string"
-                    ? current.property.start + 1
-                    : current.property.start;
+            const start = getPropertyNameStart(current.property);
 
             props.unshift({ name: propName, start });
             current = current.object; // Head up the chain in the expression
@@ -648,6 +659,7 @@ function captureObjectExpressionProperties(
         start: number,
         scope?: string,
         assigned?: boolean,
+        isCallee?: boolean,
     ) => void,
     isGlobalName: IsGlobalName,
     assigned: boolean,
@@ -667,7 +679,7 @@ function captureObjectExpressionProperties(
         // so their properties aren't tracked
         capturePropertyCallback(
             propName,
-            prop.key.start,
+            getPropertyNameStart(prop.key),
             isGlobalObject ? undefined : parentScope,
             assigned,
         );
@@ -732,24 +744,16 @@ function isFunctionOwnBinding(
 }
 
 /**
- * Is an identifier excluded from highlighting and extraction because of its
- * immediate parent: a call/`new` callee, a shorthand property's value, or a
+ * Is an identifier excluded from highlighting and extraction because it's a
  * function's own name or parameter?
  *
- * A callee isn't a story-variable occurrence yet -- it's a function/constructor
- * reference, which is issue 07's business. Its arguments, though, are ordinary
- * reads. Nor are a function declaration's or function expression's own name
- * and parameters occurrences (issue 06 is what starts treating declarations as
- * story-variable writes). Arrow-function parameters aren't excluded here: they
- * never resolve to a story variable because they're never scope-annotated, but
- * they're still highlighted as variables. Nor -- pre-existing defect 10, out of
- * scope here -- is a shorthand object-literal property's value (e.g. `a` in
- * `{a}`): it's always reported as the property, never as the variable read it
- * also is. Everything else -- references, plus `var`/`let`/`const` and `catch`
- * declarations -- is a real occurrence today.
- *
- * Callee and shorthand exclusions are temporary (issue 07 removes them), so
- * `isEveryIdentifierAVariable` deliberately doesn't use this.
+ * Callees and shorthand object-literal values are real occurrences. A function
+ * declaration's or function expression's own name and parameters aren't (issue
+ * 06 is what starts treating declarations as story-variable writes).
+ * Arrow-function parameters aren't excluded here: they never resolve to a story
+ * variable because they're never scope-annotated, but they're still highlighted
+ * as variables. Everything else -- references, plus `var`/`let`/`const` and
+ * `catch` declarations -- is a real occurrence.
  *
  * @param role The identifier's classified role.
  * @param parent The identifier's immediate parent node, if any.
@@ -761,8 +765,6 @@ function isExcludedIdentifier(
     parent: acorn.AnyNode | undefined,
     node: acorn.AnyNode,
 ): boolean {
-    if (isCallee(node, parent)) return true;
-    if (parent?.type === "Property" && parent.shorthand) return true;
     // A top-level function declaration's name is a write, so let it through
     if (
         parent?.type === "FunctionDeclaration" &&
@@ -948,7 +950,7 @@ function computeSemanticTokens(
                 // Unlike extraction, highlighting doesn't need to walk up the
                 // ancestors to find a scope prefix: every property key gets its
                 // own token regardless of nesting.
-                captureProperty(propName, node.key.start);
+                captureProperty(propName, getPropertyNameStart(node.key));
                 break;
             }
 
@@ -979,6 +981,7 @@ interface RawPropertyOccurrence {
     at: number;
     scope?: string;
     assigned: boolean;
+    isCallee: boolean;
 }
 
 /**
@@ -1025,6 +1028,7 @@ function extractSymbols(
         start: number,
         scope?: string,
         assigned = false,
+        isCallee = false,
     ) => {
         if (!name) return;
         // Properties without a scope (e.g. globals') aren't tracked.
@@ -1034,6 +1038,7 @@ function extractSymbols(
             at: start,
             scope,
             assigned,
+            isCallee,
         };
     };
 
@@ -1067,10 +1072,8 @@ function extractSymbols(
                 captureVariable(chain.root);
 
                 // If this member expression is itself a call or `new` callee
-                // (e.g. `obj.method` in `obj.method(x)`, `obj.Foo` in
-                // `new obj.Foo(x)`), its last segment is a function reference,
-                // not a property occurrence -- that's issue 07's business,
-                // same as a plain callee.
+                // (e.g. `obj.method` in `obj.method(x)`), its last segment is a
+                // method-call property.
                 const lastIsCallee = isCallee(node, parentOf(ancestors));
 
                 // Track dynamic properties incrementally
@@ -1080,9 +1083,6 @@ function extractSymbols(
                     if (prop.name === undefined) {
                         dynamicEncountered = true;
                         return; // Skip capturing dynamic property itself
-                    }
-                    if (lastIsCallee && i === chain.properties.length - 1) {
-                        return; // Skip the callee's own name
                     }
 
                     // Scope is valid only until the first dynamic property
@@ -1102,6 +1102,7 @@ function extractSymbols(
                         prop.start,
                         scope,
                         written && i === chain.properties.length - 1,
+                        lastIsCallee && i === chain.properties.length - 1,
                     );
                 });
                 break;
@@ -1196,7 +1197,7 @@ function extractSymbols(
                 // objects so they don't get tracked as occurrences.
                 captureProperty(
                     propName,
-                    node.key.start,
+                    getPropertyNameStart(node.key),
                     isGlobalObjectScope(parentScope || "", isGlobalName)
                         ? undefined
                         : parentScope || undefined,
@@ -1223,9 +1224,8 @@ function extractSymbols(
  * parameters, and call/`new` callees. Callees are skipped because they name
  * story-format or JS functions (`either(...)`, `visited(...)`), not variables.
  *
- * Unlike `isCandidateVariable`, this doesn't follow extraction's temporary
- * exclusions: a shorthand property's value (`a` in `{a}`) is a read, so it's
- * checked. It's purpose-built for callers like `isTwineScriptExpression` that
+ * Unlike `isCandidateVariable`, this skips callees, which extraction now
+ * indexes. It's purpose-built for callers like `isTwineScriptExpression` that
  * only need a yes/no answer about the identifiers themselves, not their scope.
  *
  * @param ast Parsed AST to walk.
@@ -1412,6 +1412,7 @@ export function tokenizeJavaScript(
                 ),
                 prefix: property.scope,
                 assigned: property.assigned,
+                ...(property.isCallee ? { isCallee: true } : {}),
             });
         }
     }

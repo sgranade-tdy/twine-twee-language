@@ -16,12 +16,39 @@ import {
 } from "../../host-globals";
 
 /**
+ * SugarCube's global functions, which a called identifier would otherwise
+ * index as a story variable.
+ */
+const sugarCubeGlobalFunctions: ReadonlySet<string> = new Set([
+    "clone",
+    "either",
+    "forget",
+    "hasVisited",
+    "lastVisited",
+    "memorize",
+    "passage",
+    "previous",
+    "random",
+    "randomInt",
+    "recall",
+    "setPageElement",
+    "tags",
+    "temporary",
+    "time",
+    "turns",
+    "variables",
+    "visited",
+    "visitedTags",
+]);
+
+/**
  * Host globals that are never SugarCube story variables. Story and temporary
  * variables are sigiled (`$x`, `_x`) and desugared to `Xx` before JavaScript
  * parsing, so no bare host name can collide with one, and a bare `$` that
  * survives desugaring is always jQuery.
  */
 export const sugarCubeHostGlobals: ReadonlySet<string> = new Set([
+    ...sugarCubeGlobalFunctions,
     ...browserGlobals,
     ...collisionProneBrowserGlobals,
     ...jQueryGlobals,
