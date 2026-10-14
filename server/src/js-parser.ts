@@ -369,10 +369,12 @@ function isWriteTarget(
         case "RestElement":
             return true;
         case "ObjectPattern":
-            // acorn-walk skips the `Property` between the pattern and its
-            // value, so find which property (if any) holds this node.
-            return parent.properties.some(
-                (prop) => prop.type === "Property" && prop.value === node,
+            // acorn-walk skips the `Property` or `RestElement` between the
+            // pattern and its value, so find which one (if any) holds this node.
+            return parent.properties.some((prop) =>
+                prop.type === "Property"
+                    ? prop.value === node
+                    : prop.argument === node,
             );
         default:
             return false;
