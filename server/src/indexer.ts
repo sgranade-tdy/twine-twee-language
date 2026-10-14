@@ -135,7 +135,8 @@ export function updateProjectIndex(
         getParser,
     );
 
-    // Collate the array of individual references by kind and name
+    // Collate the array of individual references by kind, name and callee-ness,
+    // so diagnostics can exempt call sites without exempting plain reads
     const referencesMap: Record<string, References> = {};
     for (const symbol of indexingState.references) {
         const key = `${symbol.kind},${symbol.contents},${!!symbol.isCallee}`;

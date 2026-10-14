@@ -33,7 +33,9 @@ export interface Label {
 export interface Callable {
     /**
      * For properties, whether the property is the callee of a call or `new`.
-     * On `References`, true only if every location is such a callee.
+     * On `References`, true only if every location is such a callee. The
+     * indexer keeps callee and non-callee occurrences of a name in separate
+     * `References`, so a document can have two entries with the same contents.
      */
     isCallee?: boolean;
 }
@@ -613,11 +615,11 @@ export class Index implements ProjectIndex {
         for (const referencesPerKind of Object.values(this._references)) {
             const localReferences = referencesPerKind[references.kind];
             if (localReferences !== undefined) {
-                const ref = localReferences.find(
-                    (ref) => ref.contents === references.contents,
-                );
-                if (ref !== undefined) {
-                    references.locations.push(...ref.locations);
+                // A name can have both a callee and a non-callee entry
+                for (const ref of localReferences) {
+                    if (ref.contents === references.contents) {
+                        references.locations.push(...ref.locations);
+                    }
                 }
             }
         }

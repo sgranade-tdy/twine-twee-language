@@ -76,6 +76,20 @@ spelled isn't a story property at all.
 Every occurrence is indexed; the same name occurring five times is five
 occurrences, because rename must rewrite all of them.
 
+**Callee**: an occurrence of a story property that is the function being called,
+by a call or `new` (`push` in `$arr.push(x)`). Callee-ness belongs to the
+occurrence, not the name: `$quest.find(x)` and a bare `$quest.find` read are
+indexed separately, so diagnostics can treat them differently.
+
+**Built-in JS property**: a story property whose last path segment names
+something every JavaScript value of some type already has, so a never-set
+warning would be a false positive. Two kinds: **instance properties**
+(`length`, `constructor`), exempt in any position; and **method names**
+(`push`, `map`, `keys`), exempt only on a callee. Names an author would
+naturally choose for their own data (`name`, `description`, `size`) are
+deliberately left out, even though built-ins have them. Distinct from a host
+global or story-format built-in, which are bare names, not properties.
+
 **Assignment**: an occurrence the parser _counts_ as writing the name (`$x = 1`,
 `$x.y = 1`), as evidence that the story variable gets set. Twine variables are
 never declared, so this is the only creation signal the parser has. Three things
