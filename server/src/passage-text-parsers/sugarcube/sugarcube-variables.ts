@@ -79,3 +79,10 @@ export const builtInVarsAndProperties: ReadonlySet<string> = new Set([
 export const builtinVars: ReadonlySet<string> = new Set(
     [...builtInVarsAndProperties].map((x) => x.split(".", 1)[0]),
 );
+
+// There's deliberately no list of `MacroContext` (`this.name`, `this.args`, ...)
+// or `Passage` (`id`, `name`, `tags`, `text`) members. The parser doesn't emit
+// properties rooted in `this` or in a call result like `passage()`, so such a
+// list could never match, and exempting those names on any story variable would
+// hide typos in `$player.name`. If the parser starts tracing those roots,
+// add a root-keyed list (and a test that reaches it) at the same time.
