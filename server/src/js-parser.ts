@@ -231,11 +231,9 @@ interface ScopedIdentifier extends acorn.Identifier {
  * bound or unbound name), or neither (a property key, a label, or an import
  * binding, none of which are ever variables).
  *
- * This is the single source of truth for that question. Both the scope-
- * annotating walk (which needs to know whether to bind a name) and the
- * tokenizing/extraction walk (which needs to know whether an identifier is a
- * candidate occurrence at all) consult it instead of re-deriving the answer
- * from ancestor types themselves.
+ * The highlighting and extraction walks consult it to decide whether an
+ * identifier is a candidate occurrence at all. Binding and scope come from
+ * eslint-scope, not from here.
  */
 type IdentifierRole = "declaration" | "reference" | "neither";
 
