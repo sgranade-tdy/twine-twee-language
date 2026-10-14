@@ -462,9 +462,9 @@ function toProgram(ast: acorn.Node): ESTree.Program {
 /**
  * Annotate variable definitions or references along with their scope.
  *
- * Scope resolution comes from eslint-scope (see ADR-0004). A reference counts
- * as being in the "global" scope, i.e. a story variable, if nothing resolves
- * it or it resolves to a root-level declaration (global or module scope).
+ * Scope resolution comes from eslint-scope (see ADR-0004). A reference is a
+ * story variable (`_scopeType` `"global"`) if nothing resolves it or it
+ * resolves to a root-level declaration (global or module scope).
  *
  * @param ast AST to annotate.
  * @param isAssignmentContext True if write-shaped syntax counts as an assignment.
@@ -477,8 +477,10 @@ function annotateVariableScopes(ast: acorn.Node, isAssignmentContext: boolean) {
         optimistic: true,
     });
 
+    const isRootScope = (scope: eslintScope.Scope): boolean =>
+        scope.type === "global" || scope.type === "module";
     const scopeTypeOf = (scope: eslintScope.Scope): ScopeType =>
-        scope.type === "global" || scope.type === "module"
+        isRootScope(scope)
             ? "global"
             : scope.type === "function"
               ? "function"
@@ -505,9 +507,7 @@ function annotateVariableScopes(ast: acorn.Node, isAssignmentContext: boolean) {
 
     // Root-level declarations are assignments, whether or not they have an
     // initializer (and so a write reference).
-    const rootScopes = scopeManager.scopes.filter(
-        (scope) => scope.type === "global" || scope.type === "module",
-    );
+    const rootScopes = scopeManager.scopes.filter(isRootScope);
     for (const scope of rootScopes) {
         for (const variable of scope.variables) {
             for (const def of variable.defs) {

@@ -2797,7 +2797,6 @@ describe("JS Parser", () => {
                 description:
                     "l: for(;;){ break l } // a label is never a variable",
                 input: "l: for(;;){ break l }",
-                input: "l: for(;;){ break l }",
                 isProgram: true,
                 variables: [],
                 properties: [],
