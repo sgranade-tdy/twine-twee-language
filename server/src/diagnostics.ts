@@ -1,6 +1,5 @@
 import {
     DiagnosticSeverity,
-    Diagnostic,
     Location,
     Range,
 } from "vscode-languageserver";
@@ -12,7 +11,9 @@ import {
     DisableDiagnosticTag,
     isDiagnosticCode,
 } from "@tt3/shared";
-import { Label } from "./project-index";
+import { Label, TwineDiagnostic } from "./core-types";
+
+export type { TwineDiagnostic };
 
 /**
  * Metadata for diagnostic.
@@ -26,13 +27,6 @@ interface DiagnosticMetadata {
      * Diagnostic severity. If omitted, `DiagnosticSeverity.Error` is used.
      */
     severity?: DiagnosticSeverity;
-}
-
-/**
- * Twine diagnostic.
- */
-export interface TwineDiagnostic extends Diagnostic {
-    code: DiagnosticCode;
 }
 
 const DiagnosticMetadata: Record<DiagnosticCode, DiagnosticMetadata> = {
