@@ -6,7 +6,7 @@ import { DecorationType } from "@tt3/shared";
 import { buildInsertInfo } from "./inserts/insert-builders";
 import { buildModifierInfo } from "./modifiers/modifier-builders";
 import { MockCallbacks, buildParsingState, buildPassage } from "../../builders";
-import { ParseLevel } from "../../../passage-text-parsers/types";
+import { ParseLevel } from "../../../parser-types";
 import { TwineSymbolKind } from "../../../project-index";
 import { ETokenModifier, ETokenType } from "../../../semantic-tokens";
 import {

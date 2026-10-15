@@ -11,9 +11,12 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 
 import { EmbeddedDocument } from "../../embedded-languages";
 import { ProjectIndex } from "../../project-index";
-import { SugarCubeParserAPI } from "./parsing-types";
+import {
+    SugarCubeParserAPI,
+    OSugarCubeSymbolKind,
+    SugarCubeSymbol,
+} from "./types";
 import { getSugarCubeDefinitions } from "./sugarcube-parser";
-import { OSugarCubeSymbolKind, SugarCubeSymbol } from "./types";
 
 /**
  * Generate completions for variables and properties.

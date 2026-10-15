@@ -5,12 +5,11 @@
 
 import { DiagnosticCodes } from "@tt3/shared";
 import { logDiagnosticFor, parsePassageReference } from "../../../parser";
-import { ParsingState } from "../../types";
+import { ParsingState, capturePreSemanticTokenFor } from "../../types";
 import { ETokenType } from "../../../semantic-tokens";
 import { skipSpaces } from "../../../utilities";
-import { capturePreSemanticTokenFor } from "../../types";
 import { Token } from "../../../types";
-import { SugarCubeParsingState } from "../parsing-types";
+import { SugarCubeParsingState } from "../types";
 import { createVariableAndPropertyReferences } from "../sugarcube-utils";
 import {
     isTwineScriptExpression,

@@ -7,9 +7,9 @@ import {
     DisableDiagnosticTag,
     StoryFormat,
 } from "@tt3/shared";
-import { Label, TwineDiagnostic } from "./core-types";
 import { EmbeddedDocument } from "./embedded-languages";
 import { SemanticToken } from "./semantic-tokens";
+import { Label, TwineDiagnostic } from "./types";
 import { positionInRange, rangeInRange } from "./utilities";
 
 /**
@@ -19,7 +19,6 @@ export interface Kind {
     kind: number;
 }
 
-export type { Label };
 /**
  * A label with a number that identifies the kind of label it is.
  */

@@ -5,9 +5,8 @@ import { TokenizedJS } from "../../js-parser";
 import { logDiagnostic, logRawDiagnostic } from "../../parser";
 import { ParsingState } from "../types";
 import { positionInRange } from "../../utilities";
-import { SugarCubeParsingState } from "./parsing-types";
+import { SugarCubeParsingState, OSugarCubeSymbolKind } from "./types";
 import { builtinVars, builtInVarsAndProperties } from "./sugarcube-variables";
-import { OSugarCubeSymbolKind } from "./types";
 
 function isInScriptMacro(sugarcubeState: SugarCubeParsingState): boolean {
     return sugarcubeState.unclosedMacros.some((p) => p.name === "script");

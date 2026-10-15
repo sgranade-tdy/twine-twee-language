@@ -28,7 +28,14 @@ export default defineConfig(
         files: ["server/src/**/*.ts"],
         ignores: ["**/*.test.ts", "server/src/test/**"],
         plugins: { "import-x": flatConfigs.recommended.plugins["import-x"] },
-        settings: { "import-x/extensions": [".ts", ".js"], "import-x/resolver-next": [createNodeResolver({ extensions: [".ts", ".js"] })] },
+        settings: {
+            "import-x/extensions": [".ts", ".js"],
+            "import-x/resolver-next": [
+                createNodeResolver({ extensions: [".ts", ".js"] }),
+            ],
+        },
+        // Only runtime import cycles are banned. We're good with `import type`
+        // cycles since they vanish upon compilation.
         rules: { "import-x/no-cycle": "error" },
     },
     {

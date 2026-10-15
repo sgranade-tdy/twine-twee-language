@@ -1,6 +1,5 @@
 import { parsePassageReference } from "../../../parser";
-import { ArgumentRequirement, ValueType } from "../types";
-import { InsertInfo } from "./types";
+import { ArgumentRequirement, ValueType, InsertInfo } from "../types";
 
 export const link: InsertInfo = {
     name: "link to",

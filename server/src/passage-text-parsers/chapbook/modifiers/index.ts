@@ -6,9 +6,9 @@ import { cont } from "./continue";
 import { css } from "./css";
 import { javascript } from "./javascript";
 import { note } from "./note";
-import { ModifierInfo } from "./types";
+import { ModifierInfo } from "../types";
 
-export * from "./types";
+export * from "../types";
 
 const builtins: ModifierInfo[] = [
     after,

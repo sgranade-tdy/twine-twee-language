@@ -6,33 +6,15 @@ import {
     Hover,
     Location,
     Position,
-    Range,
     TextEdit,
 } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
-import { DecorationRange, DiagnosticCode, StoryFormat } from "@tt3/shared";
+import { DiagnosticCode, StoryFormat } from "@tt3/shared";
 import { EmbeddedDocument } from "../embedded-languages";
-import { Passage, ProjectIndex, ProjSymbol, StoryData } from "../project-index";
-import { SemanticToken, TokenModifier, TokenType } from "../semantic-tokens";
-
-/**
- * At what level of detail to parse a Twee document.
- */
-export enum ParseLevel {
-    /**
-     * Just the StoryData passage (if it exists) -- used to find the story format quickly.
-     */
-    StoryData = 1,
-    /**
-     * StoryData and names of passages, but not the content of passages.
-     */
-    PassageNames,
-    /**
-     * Everything.
-     */
-    Full,
-}
+import { ParseLevel, ParserCallbacks } from "../parser-types";
+import { Passage, ProjectIndex } from "../project-index";
+import { TokenModifier, TokenType } from "../semantic-tokens";
 
 /**
  * Captures information about the current state of parsing
@@ -66,23 +48,6 @@ export interface ParsingState {
      * Callbacks for parsing events
      */
     callbacks: ParserCallbacks;
-}
-
-/**
- * Callbacks during parsing.
- */
-export interface ParserCallbacks {
-    onPassage(passage: Passage): void;
-    onSymbolDefinition(symbol: ProjSymbol): void;
-    onSymbolReference(symbol: ProjSymbol): void;
-    onStoryTitle(title: string, range: Range): void;
-    onStoryData(data: StoryData, range: Range): void;
-    onEmbeddedDocument(document: EmbeddedDocument): void;
-    onSemanticToken(token: SemanticToken): void;
-    onFoldingRange(range: Range): void;
-    onDecorationRange(range: DecorationRange): void;
-    onParseError(error: Diagnostic): void;
-    onDisabledDiagnosticRange(code: DiagnosticCode, range: Range): void;
 }
 
 /**

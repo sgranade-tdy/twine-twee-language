@@ -7,7 +7,7 @@ import { MockCallbacks, buildParsingState } from "../../../builders";
 import {
     ChapbookParserAPI,
     ChapbookParsingState,
-} from "../../../../passage-text-parsers/chapbook/parsing-types";
+} from "../../../../passage-text-parsers/chapbook/types";
 import { buildInsertTokens } from "./insert-builders";
 import { Token } from "../../../../types";
 import * as uutEmbedPassage from "../../../../passage-text-parsers/chapbook/inserts/embed-passage";

@@ -7,7 +7,6 @@ import {
     createDiagnosticFor,
     createDiagnosticFromRange,
     disabledDiagnosticsFromPassageTagLabels,
-    TwineDiagnostic,
 } from "./diagnostics";
 import {
     EmbeddedDocument,
@@ -16,7 +15,6 @@ import {
     storyDataJSONUri,
 } from "./embedded-languages";
 import {
-    Label,
     Passage,
     PassageMetadata,
     ProjSymbol,
@@ -29,16 +27,15 @@ import {
     openMetaCharRegex,
     tagRegex,
 } from "./language";
+import { ParseLevel, ParserCallbacks } from "./parser-types";
 import {
-    ParseLevel,
-    ParserCallbacks,
     ParsingState,
     StoryFormatParser,
     StoryFormatParsingState,
     capturePreSemanticTokenFor,
 } from "./passage-text-parsers/types";
 import { ETokenType, TokenModifier, TokenType } from "./semantic-tokens";
-import { Token } from "./types";
+import { Label, Token, TwineDiagnostic } from "./types";
 import {
     nextLineIndex,
     pairwise,
@@ -926,16 +923,16 @@ function parseTwee3(state: ParsingState): void {
  * @param callbacks Parser event callbacks.
  * @param parseLevel What level of parsing to do.
  * @param storyFormat Previous story format (if any) to use in parsing.
- * @param getParser Function to get a story-format-specific parser. Defaults to no parser.
+ * @param getParser Function to get a story-format-specific parser.
  */
 export function parse(
     textDocument: TextDocument,
     callbacks: ParserCallbacks,
     parseLevel: ParseLevel,
-    storyFormat?: StoryFormat,
+    storyFormat: StoryFormat | undefined,
     getParser: (
         format: StoryFormat | undefined,
-    ) => StoryFormatParser | undefined = () => undefined,
+    ) => StoryFormatParser | undefined,
 ): void {
     const state: ParsingState = {
         textDocument: textDocument,

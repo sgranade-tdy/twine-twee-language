@@ -14,8 +14,9 @@ import {
     StoryFormatParsingState,
     capturePreSemanticTokenFor,
 } from "./passage-text-parsers/types";
-import { Callable, calleeFlag, Label } from "./project-index";
+import { Callable, calleeFlag } from "./project-index";
 import { ETokenType, TokenModifier, TokenType } from "./semantic-tokens";
+import { Label } from "./types";
 
 /**
  * Conversion from Javascript typeof string to semantic token type.

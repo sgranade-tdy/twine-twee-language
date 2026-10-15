@@ -1,5 +1,4 @@
-import { ModifierKind } from "../parsing-types";
-import { ModifierInfo } from "./types";
+import { ModifierKind, ModifierInfo } from "../types";
 
 export const note: ModifierInfo = {
     name: "note",

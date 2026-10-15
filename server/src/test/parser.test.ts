@@ -5,11 +5,8 @@ import { Range, Position, Location } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
 import { DiagnosticCodes, StoryFormat } from "@tt3/shared";
-import {
-    ParseLevel,
-    ParsingState,
-    StoryFormatParser,
-} from "../passage-text-parsers/types";
+import { ParseLevel } from "../parser-types";
+import { ParsingState, StoryFormatParser } from "../passage-text-parsers/types";
 import { TwineSymbolKind } from "../project-index";
 import { ETokenType } from "../semantic-tokens";
 import { MockCallbacks, buildParsingState } from "./builders";
@@ -34,6 +31,8 @@ function buildStoryData({
     };
 }
 
+const noStoryFormatParser = () => undefined;
+
 describe("Server Twine Parser", () => {
     describe("Passages", () => {
         describe("General", () => {
@@ -46,7 +45,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1\nP1 contents\n\n:: Passage 2\nP2 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.passages.length).to.equal(2);
             });
@@ -60,7 +65,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1\nP1 contents\n\n:: Passage 2\nP2 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.foldingRanges).to.eql([
                     Range.create(0, 0, 2, 0),
@@ -77,7 +88,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 \nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.passages[0].name.contents).to.equal(
                     "Passage 1",
@@ -93,7 +110,13 @@ describe("Server Twine Parser", () => {
                     ":: \\[Passage\\] \\1 \nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.passages[0].name.contents).to.equal(
                     "[Passage] 1",
@@ -109,7 +132,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 \nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const result = callbacks.passages[0].name.location;
                 expect(result.range.start).to.eql(Position.create(0, 3));
                 expect(result.range.end).to.eql(Position.create(0, 12));
@@ -124,7 +153,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 [tag-1  tag_2]\nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const result = callbacks.passages[0].tags;
 
                 expect(result).to.eql([
@@ -154,7 +189,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 [tag-1  tag_2]\nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const result = callbacks.references;
 
                 expect(result).to.eql([
@@ -186,7 +227,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 [tag-1 tag_2 tag-1]\nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const result = callbacks.passages[0].tags?.map(
                     (x) => x.contents,
                 );
@@ -203,7 +250,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 [tag-1 \\[tag_2\\]]\nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const result = callbacks.passages[0].tags;
 
                 expect(result).to.eql([
@@ -233,7 +286,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 [script]\nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.passages[0].isScript).to.be.true;
             });
@@ -247,7 +306,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 [not-a-script]\nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.passages[0].isScript).to.be.false;
             });
@@ -261,7 +326,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 [stylesheet]\nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.passages[0].isStylesheet).to.be.true;
             });
@@ -275,7 +346,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 [not-a-stylesheet]\nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.passages[0].isStylesheet).to.be.false;
             });
@@ -289,7 +366,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 [stylesheet]\nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const [result] = callbacks.embeddedDocuments;
 
                 expect(result.document.getText()).to.eql("P1 contents");
@@ -306,7 +389,13 @@ describe("Server Twine Parser", () => {
                     ':: Passage 1 {"position":"600,400", "size":"100,200"}\nP1 contents',
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const [result] = callbacks.passages;
 
                 expect(result.metadata).to.eql({
@@ -331,7 +420,13 @@ describe("Server Twine Parser", () => {
                     ':: Passage 1 {"position":"600,400", "size":"100,200"}\nP1 contents',
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const [result] = callbacks.embeddedDocuments;
 
                 expect(result.document.getText()).to.eql(
@@ -350,7 +445,13 @@ describe("Server Twine Parser", () => {
                     ':: Passage 1 [tag-1] {"position":"600,400"}\nP1 contents',
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const result = callbacks.passages[0];
 
                 expect(result.tags).to.eql([
@@ -383,7 +484,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 \nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const result = callbacks.passages[0].scope;
 
                 expect(result.start).to.eql(Position.create(0, 0));
@@ -399,7 +506,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 \nP1 contents\n:: Passage 2",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const result = callbacks.passages[0].scope;
 
                 expect(result.start).to.eql(Position.create(0, 0));
@@ -415,7 +528,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1 \r\nP1 contents\r\n:: Passage 2",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const result = callbacks.passages[0].scope;
 
                 expect(result.start).to.eql(Position.create(0, 0));
@@ -431,7 +550,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1\nP1 contents\n",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.PassageNames);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.PassageNames,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const [result] = callbacks.passages;
 
                 expect(callbacks.passages.length).to.equal(1);
@@ -448,7 +573,13 @@ describe("Server Twine Parser", () => {
                     ":: Passage 1\nP1 contents",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.StoryData);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.StoryData,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.passages).to.be.empty;
             });
@@ -464,7 +595,13 @@ describe("Server Twine Parser", () => {
                     ":: StoryTitle\nSweet title!\n",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyTitle).to.eql("Sweet title!");
             });
@@ -478,7 +615,13 @@ describe("Server Twine Parser", () => {
                     ":: StoryTitle\nSweet title!",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyTitleRange?.start).to.eql(
                     Position.create(1, 0),
@@ -497,7 +640,13 @@ describe("Server Twine Parser", () => {
                     ":: StoryTitle\r\nSweet title!",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyTitleRange?.start).to.eql(
                     Position.create(1, 0),
@@ -516,7 +665,13 @@ describe("Server Twine Parser", () => {
                     ":: StoryTitle\r\nSweet title!",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.PassageNames);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.PassageNames,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyTitleRange?.start).to.eql(
                     Position.create(1, 0),
@@ -535,7 +690,13 @@ describe("Server Twine Parser", () => {
                     ":: StoryTitle\r\nSweet title!",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.StoryData);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.StoryData,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyTitleRange).to.be.undefined;
             });
@@ -553,7 +714,13 @@ describe("Server Twine Parser", () => {
                         ":: NextPassage\nContent",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
                 const [result] = callbacks.embeddedDocuments;
 
                 expect(result.document.getText()).to.eql(
@@ -577,7 +744,13 @@ describe("Server Twine Parser", () => {
                         "}\n",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyDataRange?.start).to.eql(
                     Position.create(1, 0),
@@ -599,7 +772,13 @@ describe("Server Twine Parser", () => {
                         "}\r\n",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyDataRange?.start).to.eql(
                     Position.create(1, 0),
@@ -621,7 +800,13 @@ describe("Server Twine Parser", () => {
                     ":: StoryData\n" + JSON.stringify(storyData, null, "\t"),
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyData?.ifid).to.eql(
                     "62891577-8D8E-496F-B46C-9FF0194C0EAC",
@@ -640,7 +825,13 @@ describe("Server Twine Parser", () => {
                     ":: StoryData\n" + JSON.stringify(storyData, null, "\t"),
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyData?.storyFormat?.format).to.eql(
                     "MySuperSweetFormat",
@@ -660,7 +851,13 @@ describe("Server Twine Parser", () => {
                     ":: StoryData\n" + JSON.stringify(storyData, null, "\t"),
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(
                     callbacks.storyData?.storyFormat?.formatVersion,
@@ -680,7 +877,13 @@ describe("Server Twine Parser", () => {
                     ":: StoryData\n" + JSON.stringify(storyData, null, "\t"),
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyData?.storyFormat).to.be.undefined;
             });
@@ -697,7 +900,13 @@ describe("Server Twine Parser", () => {
                     ":: StoryData\n" + JSON.stringify(storyData, null, "\t"),
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyData?.start).to.eql("17.2");
             });
@@ -717,7 +926,13 @@ describe("Server Twine Parser", () => {
                     ":: StoryData\n" + JSON.stringify(storyData, null, "\t"),
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyData?.tagColors).to.eql({
                     "tag-1": "black",
@@ -734,7 +949,13 @@ describe("Server Twine Parser", () => {
                     ":: StoryData\n" + JSON.stringify(storyData, null, "\t"),
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.Full);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.Full,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyData?.zoom).to.eql(0.83);
             });
@@ -751,7 +972,13 @@ describe("Server Twine Parser", () => {
                         "}\n",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.PassageNames);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.PassageNames,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyDataRange?.start).to.eql(
                     Position.create(1, 0),
@@ -773,7 +1000,13 @@ describe("Server Twine Parser", () => {
                         "}\n",
                 );
 
-                uut.parse(doc, callbacks, ParseLevel.StoryData);
+                uut.parse(
+                    doc,
+                    callbacks,
+                    ParseLevel.StoryData,
+                    undefined,
+                    noStoryFormatParser,
+                );
 
                 expect(callbacks.storyDataRange?.start).to.eql(
                     Position.create(1, 0),
@@ -1331,7 +1564,13 @@ describe("Server Twine Parser", () => {
                         ':: Passage 1 {"position":"600,400"} [tag]\nP1 contents',
                     );
 
-                    uut.parse(doc, callbacks, ParseLevel.Full);
+                    uut.parse(
+                        doc,
+                        callbacks,
+                        ParseLevel.Full,
+                        undefined,
+                        noStoryFormatParser,
+                    );
 
                     expect(callbacks.errors.length).to.equal(1);
                     expect(callbacks.errors[0].message).to.include(
@@ -1351,7 +1590,13 @@ describe("Server Twine Parser", () => {
                         ':: Passage 1 {"position":"600,400"} Bad!\nP1 contents',
                     );
 
-                    uut.parse(doc, callbacks, ParseLevel.Full);
+                    uut.parse(
+                        doc,
+                        callbacks,
+                        ParseLevel.Full,
+                        undefined,
+                        noStoryFormatParser,
+                    );
 
                     expect(callbacks.errors.length).to.equal(1);
                     expect(callbacks.errors[0].message).to.include(
@@ -1371,7 +1616,13 @@ describe("Server Twine Parser", () => {
                         ":: Passage 1 [tag1] Bad!\nP1 contents",
                     );
 
-                    uut.parse(doc, callbacks, ParseLevel.Full);
+                    uut.parse(
+                        doc,
+                        callbacks,
+                        ParseLevel.Full,
+                        undefined,
+                        noStoryFormatParser,
+                    );
 
                     expect(callbacks.errors.length).to.equal(1);
                     expect(callbacks.errors[0].message).to.include(
@@ -1391,7 +1642,13 @@ describe("Server Twine Parser", () => {
                         ":: Passage ] 1 } Bad!\nP1 contents",
                     );
 
-                    uut.parse(doc, callbacks, ParseLevel.Full);
+                    uut.parse(
+                        doc,
+                        callbacks,
+                        ParseLevel.Full,
+                        undefined,
+                        noStoryFormatParser,
+                    );
 
                     expect(callbacks.errors.length).to.equal(2);
                     expect(callbacks.errors[0].message).to.include(
@@ -1417,7 +1674,13 @@ describe("Server Twine Parser", () => {
                         ":: Passage 1 [nopers\nP1 contents",
                     );
 
-                    uut.parse(doc, callbacks, ParseLevel.Full);
+                    uut.parse(
+                        doc,
+                        callbacks,
+                        ParseLevel.Full,
+                        undefined,
+                        noStoryFormatParser,
+                    );
 
                     expect(callbacks.errors.length).to.equal(1);
                     expect(callbacks.errors[0].message).to.include(
@@ -1437,7 +1700,13 @@ describe("Server Twine Parser", () => {
                         ":: Passage 1 [tt3-disable missing-passage,nope,incorrect-javascript]\nP1 contents",
                     );
 
-                    uut.parse(doc, callbacks, ParseLevel.Full);
+                    uut.parse(
+                        doc,
+                        callbacks,
+                        ParseLevel.Full,
+                        undefined,
+                        noStoryFormatParser,
+                    );
 
                     expect(callbacks.errors.length).to.equal(1);
                     expect(callbacks.errors[0].message).to.include(

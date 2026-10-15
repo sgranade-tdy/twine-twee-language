@@ -5,7 +5,7 @@ import { getDefinitionAt } from "./chapbook-definitions";
 import { generateDiagnostics } from "./chapbook-diagnostics";
 import { generateHover } from "./chapbook-hover";
 import { getReferencesToSymbolAt } from "./chapbook-references";
-import type { ChapbookParserAPI } from "./parsing-types";
+import type { ChapbookParserAPI } from "./types";
 import { all as allInserts } from "./inserts";
 import { all as allModifiers } from "./modifiers";
 

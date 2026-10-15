@@ -6,7 +6,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import { DecorationType, DiagnosticCodes } from "@tt3/shared";
 import { improveAcornErrorMessage } from "../../acorn-errors";
 import type { AcornSyntaxError } from "../../acorn-errors";
-import { createDiagnosticFor, TwineDiagnostic } from "../../diagnostics";
+import { createDiagnosticFor } from "../../diagnostics";
 import { EmbeddedDocument } from "../../embedded-languages";
 import {
     parseJSStrict,
@@ -24,17 +24,17 @@ import {
     logSemanticTokenFor,
     parsePassageReference,
 } from "../../parser";
-import { ParseLevel, ParsingState } from "../types";
+import { ParseLevel } from "../../parser-types";
+import { ParsingState, capturePreSemanticTokenFor } from "../types";
 import { calleeFlag, ProjectIndex } from "../../project-index";
 import { ETokenType, ETokenModifier } from "../../semantic-tokens";
-import { Token } from "../../types";
+import { Token, TwineDiagnostic } from "../../types";
 import {
     extractToMatchingDelimiter,
     hasOwnProperty,
     skipSpaces,
     versionCompare,
 } from "../../utilities";
-import { capturePreSemanticTokenFor } from "../types";
 import { browserGlobals } from "../host-globals";
 import {
     ChapbookParserAPI,
@@ -42,12 +42,6 @@ import {
     InsertTokens,
     ModifierKind,
     ModifierTokens,
-} from "./parsing-types";
-import {
-    findShadowedVariable,
-    shadowedVariableMessage,
-} from "./chapbook-shadowing";
-import {
     ArgumentRequirement,
     ChapbookFunctionInfo,
     ChapbookSymbol,
@@ -58,6 +52,10 @@ import {
     OChapbookSymbolKind,
     ValueType,
 } from "./types";
+import {
+    findShadowedVariable,
+    shadowedVariableMessage,
+} from "./chapbook-shadowing";
 
 const varsSepRegex = /^--(\r?\n|$)/m;
 const conditionRegex = /((\((.+?)\)?)\s*)([^)]*)$/;

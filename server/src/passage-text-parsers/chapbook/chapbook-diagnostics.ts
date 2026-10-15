@@ -4,7 +4,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import { DiagnosticCodes } from "@tt3/shared";
 import { isBuiltinJSProperty } from "../../js-parser";
 import { ProjectIndex } from "../../project-index";
-import { referencesToDiagnostics } from "../../reference-diagnostics";
+import { referencesToDiagnostics } from "../../diagnostics";
 import {
     findEndOfPartialInsert,
     findEndOfPartialModifier,

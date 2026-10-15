@@ -13,10 +13,12 @@ import {
 } from "../../../builders";
 import { buildMacroInfo } from "./macro-builders";
 
-import { MacroLocationInfo } from "../../../../passage-text-parsers/sugarcube/parsing-types";
-import { OSugarCubeSymbolKind } from "../../../../passage-text-parsers/sugarcube/types";
+import {
+    MacroLocationInfo,
+    OSugarCubeSymbolKind,
+    SugarCubeParserAPI,
+} from "../../../../passage-text-parsers/sugarcube/types";
 
-import { SugarCubeParserAPI } from "../../../../passage-text-parsers/sugarcube/parsing-types";
 import * as uut from "../../../../passage-text-parsers/sugarcube/macros";
 
 const api: SugarCubeParserAPI = {
