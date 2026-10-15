@@ -1,4 +1,4 @@
-import { ModifierKind } from "../chapbook-parser";
+import { ModifierKind } from "../parsing-types";
 import { ModifierInfo } from "./types";
 
 export const cont: ModifierInfo = {

@@ -34,14 +34,19 @@ import {
     skipSpaces,
     versionCompare,
 } from "../../utilities";
-import { StoryFormatParsingState, capturePreSemanticTokenFor } from "../types";
+import { capturePreSemanticTokenFor } from "../types";
 import { browserGlobals } from "../host-globals";
-import { ChapbookParserAPI } from ".";
+import {
+    ChapbookParserAPI,
+    ChapbookParsingState,
+    InsertTokens,
+    ModifierKind,
+    ModifierTokens,
+} from "./parsing-types";
 import {
     findShadowedVariable,
     shadowedVariableMessage,
 } from "./chapbook-shadowing";
-import { InsertTokens, ModifierTokens } from "./inserts";
 import {
     ArgumentRequirement,
     ChapbookFunctionInfo,
@@ -60,29 +65,6 @@ const modifierRegex = /^([ \t]*)\[([^[].+[^\]])\](\s*?)(?:\r?\n|$)/gm;
 const varsLineExtractionRegex = /^([ \t]*)(.*)$/gm;
 const varsLineVarOnlyExtractionRegex =
     /^(\s*)([A-Za-z$_][A-Za-z0-9$_.]*)?.*$/gmu;
-
-/**
- * Type of Chapbook modifier.
- */
-export enum ModifierKind {
-    None,
-    Javascript,
-    Css,
-    Note,
-    Continue,
-    Other,
-}
-
-/**
- * Chapbook-specific parsing state information.
- */
-export interface ChapbookParsingState extends StoryFormatParsingState {
-    /**
-     * Type of modifier affecting a text block.
-     */
-    modifierKind: ModifierKind;
-    api: ChapbookParserAPI;
-}
 
 const varInsertRegex = /^({\s*)(\S+)\s*}$/;
 

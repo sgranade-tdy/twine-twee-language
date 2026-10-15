@@ -12,7 +12,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import { EmbeddedDocument } from "../../embedded-languages";
 import { ProjectIndex } from "../../project-index";
 import { removeAndCountPadding } from "../../utilities";
-import { ChapbookParserAPI } from ".";
+import { ChapbookParserAPI } from "./parsing-types";
 import {
     divideChapbookPassage,
     findStartOfModifierOrInsert,
