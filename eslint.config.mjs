@@ -25,7 +25,8 @@ export default defineConfig(
         },
     },
     {
-        files: ["server/src/acorn-errors/**/*.ts", "server/src/ecma-version.ts"],
+        files: ["server/src/**/*.ts"],
+        ignores: ["**/*.test.ts", "server/src/test/**"],
         plugins: { "import-x": flatConfigs.recommended.plugins["import-x"] },
         settings: { "import-x/extensions": [".ts", ".js"], "import-x/resolver-next": [createNodeResolver({ extensions: [".ts", ".js"] })] },
         rules: { "import-x/no-cycle": "error" },
