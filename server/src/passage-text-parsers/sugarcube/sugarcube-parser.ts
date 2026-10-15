@@ -1,7 +1,7 @@
 import { Range } from "vscode-languageserver";
 
 import { DiagnosticCodes } from "@tt3/shared";
-import { capturePreSemanticTokenFor, StoryFormatParsingState } from "../types";
+import { capturePreSemanticTokenFor } from "../types";
 import { createDiagnosticFromRange } from "../../diagnostics";
 import { EmbeddedDocument } from "../../embedded-languages";
 import { tokenizeJavaScript } from "../../js-parser";
@@ -17,7 +17,11 @@ import { ParseLevel, ParsingState } from "../types";
 import { ProjectIndex, ProjSymbol } from "../../project-index";
 import { ETokenModifier, ETokenType } from "../../semantic-tokens";
 import { eraseMatches, versionCompare } from "../../utilities";
-import { SugarCubeParserAPI } from ".";
+import {
+    MacroLocationInfo,
+    SugarCubeParserAPI,
+    SugarCubeParsingState,
+} from "./parsing-types";
 import { allMacros, MacroInfo, MacroParent } from "./macros";
 import { createVariableAndPropertyReferences } from "./sugarcube-utils";
 import { OSugarCubeSymbolKind, SugarCubeSymbolKind } from "./types";
@@ -100,43 +104,6 @@ const bareVariableRegex = new RegExp(
     ].join(""),
     "g",
 );
-
-/**
- * Location information about a macro
- */
-export interface MacroLocationInfo {
-    /**
-     * The macro's name (ex: "if")
-     */
-    name: string;
-    /**
-     * The full text of a macro (ex: "<<if $v > 1>>")
-     */
-    fullText: string;
-    /**
-     * Index where the full text occurs.
-     */
-    at: number;
-    /**
-     * Macro ID, to disambiguate macros with the same name
-     */
-    id: number;
-}
-
-/**
- * SugarCube-specific parsing state information.
- */
-export interface SugarCubeParsingState extends StoryFormatParsingState {
-    /**
-     * Container macros that are open (i.e. no close macro has been encountered).
-     */
-    unclosedMacros: MacroLocationInfo[];
-    /**
-     * Ranges of <<widget>> macros in the document, since they create variables.
-     */
-    widgetMacroRanges: Range[];
-    api: SugarCubeParserAPI;
-}
 
 /**
  * Parse text as a JavaScript script.

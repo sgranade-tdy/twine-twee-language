@@ -5,7 +5,7 @@ import { TokenizedJS } from "../../js-parser";
 import { logDiagnostic, logRawDiagnostic } from "../../parser";
 import { ParsingState } from "../types";
 import { positionInRange } from "../../utilities";
-import { SugarCubeParsingState } from "./sugarcube-parser";
+import { SugarCubeParsingState } from "./parsing-types";
 import { builtinVars, builtInVarsAndProperties } from "./sugarcube-variables";
 import { OSugarCubeSymbolKind } from "./types";
 

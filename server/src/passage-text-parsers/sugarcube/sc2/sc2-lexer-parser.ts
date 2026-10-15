@@ -10,7 +10,7 @@ import { ETokenType } from "../../../semantic-tokens";
 import { skipSpaces } from "../../../utilities";
 import { capturePreSemanticTokenFor } from "../../types";
 import { Token } from "../../../types";
-import { SugarCubeParsingState } from "../sugarcube-parser";
+import { SugarCubeParsingState } from "../parsing-types";
 import { createVariableAndPropertyReferences } from "../sugarcube-utils";
 import {
     isTwineScriptExpression,
