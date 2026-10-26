@@ -1,0 +1,27 @@
+{
+  "name": "research-bench",
+  "private": true,
+  "type": "module",
+  "description": "Throwaway benchmark for docs/research/js-parser-library-survey.md. Not part of the extension; never merged.",
+  "dependencies": {
+    "@babel/parser": "^8.0.8",
+    "@oxc-parser/binding-wasm32-wasip1": "^0.155.0",
+    "@swc/core": "^1.16.20",
+    "@swc/wasm": "^1.16.20",
+    "@typescript-eslint/typescript-estree": "^8.72.1",
+    "acorn": "^8.18.0",
+    "acorn-loose": "^8.5.2",
+    "acorn-walk": "^8.3.5",
+    "esbuild": "^0.28.2",
+    "eslint-scope": "^9.1.2",
+    "espree": "^11.2.0",
+    "jquery": "^3.7.1",
+    "lodash": "^4.17.21",
+    "meriyah": "^7.4.1",
+    "oxc-parser": "^0.155.0",
+    "three": "^0.186.1",
+    "typescript": "^6.0.3",
+    "web-tree-sitter": "^0.27.1",
+    "tree-sitter-javascript": "^0.25.0"
+  }
+}

@@ -1,0 +1,104 @@
+{"parser":"acorn","file":"story.js","kb":8,"loadMs":3.8,"coldMs":6.1,"warmMs":0.4,"retainedMB":0.4,"rssMB":119,"scopeMs":0.3}
+{"parser":"acorn","file":"jquery.min.js","kb":85,"loadMs":3.8,"coldMs":24.8,"warmMs":10,"retainedMB":5.7,"rssMB":366,"scopeMs":3}
+{"parser":"acorn","file":"lodash.min.js","kb":71,"loadMs":3.8,"coldMs":24,"warmMs":6.2,"retainedMB":5.5,"rssMB":228,"scopeMs":3.9}
+{"parser":"acorn","file":"jquery.js","kb":279,"loadMs":4.2,"coldMs":26.6,"warmMs":8.4,"retainedMB":6.4,"rssMB":243,"scopeMs":4.4}
+{"parser":"acorn","file":"lodash.js","kb":531,"loadMs":5.1,"coldMs":26.1,"warmMs":8.9,"retainedMB":5.8,"rssMB":233,"scopeMs":4.4}
+{"parser":"acorn","file":"three.module.js","kb":647,"loadMs":3.9,"coldMs":65.2,"warmMs":18.5,"retainedMB":11.3,"rssMB":403,"scopeMs":7.5}
+{"parser":"acorn","file":"three.core.js","kb":1424,"loadMs":4,"coldMs":100.2,"warmMs":37.3,"retainedMB":23.4,"rssMB":531,"scopeMs":16.4}
+{"parser":"acorn","file":"broken-midedit.js","loadMs":4.04532500000002,"error":"Unexpected token (5342:4)"}
+{"parser":"acorn-loose","file":"story.js","kb":8,"loadMs":4.7,"coldMs":5.1,"warmMs":0.5,"retainedMB":0.3,"rssMB":127,"scopeMs":0.3}
+{"parser":"acorn-loose","file":"jquery.min.js","kb":85,"loadMs":4.5,"coldMs":28.8,"warmMs":5.9,"retainedMB":5.8,"rssMB":196,"scopeMs":2.9}
+{"parser":"acorn-loose","file":"lodash.min.js","kb":71,"loadMs":4.6,"coldMs":30.9,"warmMs":5.1,"retainedMB":5.3,"rssMB":185,"scopeMs":3.6}
+{"parser":"acorn-loose","file":"jquery.js","kb":279,"loadMs":4.5,"coldMs":28.7,"warmMs":8.8,"retainedMB":6.4,"rssMB":248,"scopeMs":3.8}
+{"parser":"acorn-loose","file":"lodash.js","kb":531,"loadMs":4.5,"coldMs":30.3,"warmMs":8.9,"retainedMB":5.8,"rssMB":218,"scopeMs":5.1}
+{"parser":"acorn-loose","file":"three.module.js","kb":647,"loadMs":4.7,"coldMs":54.3,"warmMs":16.4,"retainedMB":11.3,"rssMB":421,"scopeMs":8}
+{"parser":"acorn-loose","file":"three.core.js","kb":1424,"loadMs":4.4,"coldMs":88.7,"warmMs":35.5,"retainedMB":23.5,"rssMB":496,"scopeMs":17}
+{"parser":"acorn-loose","file":"broken-midedit.js","kb":279,"loadMs":5.1,"coldMs":39.7,"warmMs":9.3,"retainedMB":6.3,"rssMB":248,"scopeMs":3.7}
+{"parser":"acorn→loose (parseJS)","file":"story.js","kb":8,"loadMs":5.1,"coldMs":5.9,"warmMs":0.6,"retainedMB":0.4,"rssMB":125,"scopeMs":0.3}
+{"parser":"acorn→loose (parseJS)","file":"jquery.min.js","kb":85,"loadMs":5.1,"coldMs":27.2,"warmMs":7.2,"retainedMB":5.9,"rssMB":349,"scopeMs":3.1}
+{"parser":"acorn→loose (parseJS)","file":"lodash.min.js","kb":71,"loadMs":4.5,"coldMs":23.4,"warmMs":6.3,"retainedMB":5.5,"rssMB":225,"scopeMs":4}
+{"parser":"acorn→loose (parseJS)","file":"jquery.js","kb":279,"loadMs":5,"coldMs":31.2,"warmMs":8.7,"retainedMB":6.4,"rssMB":237,"scopeMs":5.6}
+{"parser":"acorn→loose (parseJS)","file":"lodash.js","kb":531,"loadMs":4.8,"coldMs":26.7,"warmMs":8.6,"retainedMB":5.8,"rssMB":234,"scopeMs":4}
+{"parser":"acorn→loose (parseJS)","file":"three.module.js","kb":647,"loadMs":5.1,"coldMs":56.6,"warmMs":16.3,"retainedMB":11.3,"rssMB":331,"scopeMs":7.7}
+{"parser":"acorn→loose (parseJS)","file":"three.core.js","kb":1424,"loadMs":4.8,"coldMs":92.7,"warmMs":36.2,"retainedMB":23.4,"rssMB":525,"scopeMs":16}
+{"parser":"acorn→loose (parseJS)","file":"broken-midedit.js","kb":279,"loadMs":4.7,"coldMs":44,"warmMs":12.8,"retainedMB":6.5,"rssMB":280,"scopeMs":3.8}
+{"parser":"espree","file":"story.js","kb":8,"loadMs":6.4,"coldMs":6.5,"warmMs":0.7,"retainedMB":0.3,"rssMB":128,"scopeMs":0.3}
+{"parser":"espree","file":"jquery.min.js","kb":85,"loadMs":7,"coldMs":31,"warmMs":7.3,"retainedMB":6,"rssMB":183,"scopeMs":3.2}
+{"parser":"espree","file":"lodash.min.js","kb":71,"loadMs":11.4,"coldMs":28.4,"warmMs":7.4,"retainedMB":5.3,"rssMB":260,"scopeMs":4}
+{"parser":"espree","file":"jquery.js","kb":279,"loadMs":6.1,"coldMs":36.9,"warmMs":10.4,"retainedMB":6.5,"rssMB":402,"scopeMs":4.2}
+{"parser":"espree","file":"lodash.js","kb":531,"loadMs":6.1,"coldMs":33.3,"warmMs":10.1,"retainedMB":6,"rssMB":230,"scopeMs":5.7}
+{"parser":"espree","file":"three.module.js","kb":647,"loadMs":7.6,"coldMs":68.6,"warmMs":21.3,"retainedMB":11.2,"rssMB":444,"scopeMs":7.4}
+{"parser":"espree","file":"three.core.js","kb":1424,"loadMs":6.2,"coldMs":104.1,"warmMs":44.2,"retainedMB":23.4,"rssMB":539,"scopeMs":16.2}
+{"parser":"espree","file":"broken-midedit.js","loadMs":6.9532979999999895,"error":"Unexpected token ."}
+{"parser":"meriyah","file":"story.js","kb":8,"loadMs":3.9,"coldMs":3.3,"warmMs":0.2,"retainedMB":0.1,"rssMB":117,"scopeMs":0.3}
+{"parser":"meriyah","file":"jquery.min.js","kb":85,"loadMs":4,"coldMs":19.3,"warmMs":4.5,"retainedMB":5.3,"rssMB":382,"scopeMs":4.2}
+{"parser":"meriyah","file":"lodash.min.js","kb":71,"loadMs":3.7,"coldMs":15.1,"warmMs":4.6,"retainedMB":4.9,"rssMB":342,"scopeMs":4.3}
+{"parser":"meriyah","file":"jquery.js","kb":279,"loadMs":4.1,"coldMs":25.9,"warmMs":7.3,"retainedMB":5.9,"rssMB":393,"scopeMs":5.4}
+{"parser":"meriyah","file":"lodash.js","kb":531,"loadMs":3.8,"coldMs":24.9,"warmMs":7.8,"retainedMB":5.3,"rssMB":344,"scopeMs":5.6}
+{"parser":"meriyah","file":"three.module.js","kb":647,"loadMs":4.4,"coldMs":45.3,"warmMs":9.2,"retainedMB":11.6,"rssMB":435,"scopeMs":8}
+{"parser":"meriyah","file":"three.core.js","kb":1424,"loadMs":4.7,"coldMs":66.2,"warmMs":28.4,"retainedMB":23.4,"rssMB":555,"scopeMs":20.1}
+{"parser":"meriyah","file":"broken-midedit.js","loadMs":3.6750279999999975,"error":"[5342:4-5342:5]: Unexpected character after object literal p"}
+{"parser":"oxc-parser (native)","file":"story.js","kb":8,"loadMs":5,"coldMs":2.1,"warmMs":0.8,"retainedMB":0.3,"rssMB":131,"scopeMs":0.3}
+{"parser":"oxc-parser (native)","file":"jquery.min.js","kb":85,"loadMs":3.8,"coldMs":23.7,"warmMs":18.3,"retainedMB":5.5,"rssMB":440,"scopeMs":3.4}
+{"parser":"oxc-parser (native)","file":"lodash.min.js","kb":71,"loadMs":5.7,"coldMs":27.9,"warmMs":16,"retainedMB":5,"rssMB":331,"scopeMs":3.8}
+{"parser":"oxc-parser (native)","file":"jquery.js","kb":279,"loadMs":4.5,"coldMs":31.8,"warmMs":19.5,"retainedMB":6,"rssMB":389,"scopeMs":3.8}
+{"parser":"oxc-parser (native)","file":"lodash.js","kb":531,"loadMs":5.2,"coldMs":27.4,"warmMs":18.3,"retainedMB":5.5,"rssMB":461,"scopeMs":6.3}
+{"parser":"oxc-parser (native)","file":"three.module.js","kb":647,"loadMs":4.6,"coldMs":38.7,"warmMs":25.7,"retainedMB":11.1,"rssMB":558,"scopeMs":7.2}
+{"parser":"oxc-parser (native)","file":"three.core.js","kb":1424,"loadMs":5,"coldMs":84.7,"warmMs":59.1,"retainedMB":23.5,"rssMB":700,"scopeMs":16.7}
+{"parser":"oxc-parser (native)","file":"broken-midedit.js","kb":279,"loadMs":4.1,"coldMs":2,"warmMs":1.4,"retainedMB":0,"rssMB":121}
+{"parser":"oxc-parser (native, raw transfer)","file":"story.js","kb":8,"loadMs":7.1,"coldMs":12.7,"warmMs":0.2,"retainedMB":0.3,"rssMB":131,"scopeMs":0.4}
+{"parser":"oxc-parser (native, raw transfer)","file":"jquery.min.js","kb":85,"loadMs":4.1,"coldMs":21.9,"warmMs":3.4,"retainedMB":4.9,"rssMB":325,"scopeMs":3.2}
+{"parser":"oxc-parser (native, raw transfer)","file":"lodash.min.js","kb":71,"loadMs":3.7,"coldMs":22,"warmMs":3,"retainedMB":4.5,"rssMB":299,"scopeMs":4}
+{"parser":"oxc-parser (native, raw transfer)","file":"jquery.js","kb":279,"loadMs":3.9,"coldMs":25.3,"warmMs":4.7,"retainedMB":5.4,"rssMB":283,"scopeMs":3.5}
+{"parser":"oxc-parser (native, raw transfer)","file":"lodash.js","kb":531,"loadMs":4.1,"coldMs":28.1,"warmMs":5.7,"retainedMB":5.5,"rssMB":276,"scopeMs":5.1}
+{"parser":"oxc-parser (native, raw transfer)","file":"three.module.js","kb":647,"loadMs":4.1,"coldMs":30.4,"warmMs":6.3,"retainedMB":10.2,"rssMB":442,"scopeMs":8.1}
+{"parser":"oxc-parser (native, raw transfer)","file":"three.core.js","kb":1424,"loadMs":3.9,"coldMs":51.3,"warmMs":14.2,"retainedMB":23.1,"rssMB":534,"scopeMs":17.3}
+{"parser":"oxc-parser (native, raw transfer)","file":"broken-midedit.js","kb":279,"loadMs":4,"coldMs":13.1,"warmMs":1.5,"retainedMB":0,"rssMB":123}
+{"parser":"oxc-parser (wasm)","file":"story.js","kb":8,"loadMs":40.6,"coldMs":11.3,"warmMs":1,"retainedMB":0.3,"rssMB":152,"scopeMs":0.3}
+{"parser":"oxc-parser (wasm)","file":"jquery.min.js","kb":85,"loadMs":43.5,"coldMs":38.8,"warmMs":13.8,"retainedMB":5.5,"rssMB":273,"scopeMs":3.2}
+{"parser":"oxc-parser (wasm)","file":"lodash.min.js","kb":71,"loadMs":44.7,"coldMs":46.7,"warmMs":12.3,"retainedMB":5,"rssMB":283,"scopeMs":3.6}
+{"parser":"oxc-parser (wasm)","file":"jquery.js","kb":279,"loadMs":45.8,"coldMs":59.2,"warmMs":18,"retainedMB":6,"rssMB":228,"scopeMs":5.5}
+{"parser":"oxc-parser (wasm)","file":"lodash.js","kb":531,"loadMs":45.3,"coldMs":39.7,"warmMs":23.2,"retainedMB":5.5,"rssMB":258,"scopeMs":6.2}
+{"parser":"oxc-parser (wasm)","file":"three.module.js","kb":647,"loadMs":44.6,"coldMs":69.3,"warmMs":27.9,"retainedMB":11.2,"rssMB":370,"scopeMs":6.7}
+{"parser":"oxc-parser (wasm)","file":"three.core.js","kb":1424,"loadMs":44.5,"coldMs":120.3,"warmMs":74.7,"retainedMB":23.5,"rssMB":453,"scopeMs":16.2}
+{"parser":"oxc-parser (wasm)","file":"broken-midedit.js","kb":279,"loadMs":40.1,"coldMs":20.3,"warmMs":2.9,"retainedMB":0,"rssMB":134}
+{"parser":"@babel/parser (estree, recovery)","file":"story.js","kb":8,"loadMs":7,"coldMs":7.5,"warmMs":0.5,"retainedMB":0.7,"rssMB":132,"scopeMs":0.3}
+{"parser":"@babel/parser (estree, recovery)","file":"jquery.min.js","kb":85,"loadMs":6.9,"coldMs":41.4,"warmMs":9.6,"retainedMB":11.5,"rssMB":373,"scopeMs":4.6}
+{"parser":"@babel/parser (estree, recovery)","file":"lodash.min.js","kb":71,"loadMs":6.8,"coldMs":39.8,"warmMs":6.4,"retainedMB":10.7,"rssMB":262,"scopeMs":4.8}
+{"parser":"@babel/parser (estree, recovery)","file":"jquery.js","kb":279,"loadMs":6.8,"coldMs":44.4,"warmMs":12,"retainedMB":13.1,"rssMB":414,"scopeMs":4.6}
+{"parser":"@babel/parser (estree, recovery)","file":"lodash.js","kb":531,"loadMs":6.8,"coldMs":42.6,"warmMs":14.5,"retainedMB":11.8,"rssMB":458,"scopeMs":4.4}
+{"parser":"@babel/parser (estree, recovery)","file":"three.module.js","kb":647,"loadMs":6.7,"coldMs":72.5,"warmMs":17.9,"retainedMB":23.4,"rssMB":525,"scopeMs":9.6}
+{"parser":"@babel/parser (estree, recovery)","file":"three.core.js","kb":1424,"loadMs":7.1,"coldMs":134.9,"warmMs":52.4,"retainedMB":52,"rssMB":831,"scopeMs":22.9}
+{"parser":"@babel/parser (estree, recovery)","file":"broken-midedit.js","loadMs":6.344816000000009,"error":"Unexpected token, expected \",\" (5342:4)"}
+{"parser":"@typescript-eslint/typescript-estree","file":"story.js","kb":8,"loadMs":48.8,"coldMs":18.3,"warmMs":1.5,"retainedMB":0.2,"rssMB":169,"scopeMs":0.4}
+{"parser":"@typescript-eslint/typescript-estree","file":"jquery.min.js","kb":85,"loadMs":55.4,"coldMs":84.9,"warmMs":32.7,"retainedMB":17,"rssMB":603,"scopeMs":5.4}
+{"parser":"@typescript-eslint/typescript-estree","file":"lodash.min.js","kb":71,"loadMs":51.4,"coldMs":78.4,"warmMs":28.2,"retainedMB":15.5,"rssMB":565,"scopeMs":5.3}
+{"parser":"@typescript-eslint/typescript-estree","file":"jquery.js","kb":279,"loadMs":57.3,"coldMs":91.9,"warmMs":35.9,"retainedMB":18,"rssMB":564,"scopeMs":6}
+{"parser":"@typescript-eslint/typescript-estree","file":"lodash.js","kb":531,"loadMs":53.9,"coldMs":90.8,"warmMs":37.8,"retainedMB":16.3,"rssMB":560,"scopeMs":6.6}
+{"parser":"@typescript-eslint/typescript-estree","file":"three.module.js","kb":647,"loadMs":49.1,"coldMs":165.7,"warmMs":71.1,"retainedMB":34,"rssMB":783,"scopeMs":15.4}
+{"parser":"@typescript-eslint/typescript-estree","file":"three.core.js","kb":1424,"loadMs":49,"coldMs":298.7,"warmMs":170.6,"retainedMB":73.8,"rssMB":1036,"scopeMs":30.1}
+{"parser":"@typescript-eslint/typescript-estree","file":"broken-midedit.js","loadMs":52.15202500000001,"error":"',' expected."}
+{"parser":"@swc/core (native)","file":"story.js","kb":8,"loadMs":14.2,"coldMs":2.7,"warmMs":0.9,"retainedMB":0.3,"rssMB":138}
+{"parser":"@swc/core (native)","file":"jquery.min.js","kb":85,"loadMs":11.9,"coldMs":30.8,"warmMs":21.9,"retainedMB":4.9,"rssMB":166}
+{"parser":"@swc/core (native)","file":"lodash.min.js","kb":71,"loadMs":12.3,"coldMs":23.3,"warmMs":20.5,"retainedMB":4.6,"rssMB":181}
+{"parser":"@swc/core (native)","file":"jquery.js","kb":279,"loadMs":13.2,"coldMs":36.1,"warmMs":25.3,"retainedMB":5.5,"rssMB":169}
+{"parser":"@swc/core (native)","file":"lodash.js","kb":531,"loadMs":13.6,"coldMs":33.9,"warmMs":25.6,"retainedMB":5.5,"rssMB":197}
+{"parser":"@swc/core (native)","file":"three.module.js","kb":647,"loadMs":12.1,"coldMs":53.1,"warmMs":38,"retainedMB":10,"rssMB":318}
+{"parser":"@swc/core (native)","file":"three.core.js","kb":1424,"loadMs":12.6,"coldMs":116.9,"warmMs":91.6,"retainedMB":23.6,"rssMB":377}
+{"parser":"@swc/core (native)","file":"broken-midedit.js","loadMs":13.004043999999993,"error":"  x Unexpected token `.`. Expected ... , *,  (, [, :, , ?, ="}
+{"parser":"@swc/wasm","file":"story.js","kb":8,"loadMs":31.9,"coldMs":12.5,"warmMs":1,"retainedMB":0.4,"rssMB":153}
+{"parser":"@swc/wasm","file":"jquery.min.js","kb":85,"loadMs":30.1,"coldMs":46.2,"warmMs":18.1,"retainedMB":6.2,"rssMB":280}
+{"parser":"@swc/wasm","file":"lodash.min.js","kb":71,"loadMs":31,"coldMs":46.1,"warmMs":17.2,"retainedMB":5.9,"rssMB":280}
+{"parser":"@swc/wasm","file":"jquery.js","kb":279,"loadMs":31.6,"coldMs":49.5,"warmMs":20.3,"retainedMB":6.8,"rssMB":294}
+{"parser":"@swc/wasm","file":"lodash.js","kb":531,"loadMs":31.5,"coldMs":48.7,"warmMs":20.4,"retainedMB":6.3,"rssMB":260}
+{"parser":"@swc/wasm","file":"three.module.js","kb":647,"loadMs":28.4,"coldMs":73.3,"warmMs":31.6,"retainedMB":12.8,"rssMB":331}
+{"parser":"@swc/wasm","file":"three.core.js","kb":1424,"loadMs":28.7,"coldMs":130.6,"warmMs":70.5,"retainedMB":25.9,"rssMB":383}
+{"parser":"@swc/wasm","file":"broken-midedit.js","loadMs":28.64159600000002,"error":"undefined"}
+{"parser":"typescript createSourceFile","file":"story.js","kb":8,"loadMs":0.9,"coldMs":9.2,"warmMs":0.5,"retainedMB":0.4,"rssMB":122}
+{"parser":"typescript createSourceFile","file":"jquery.min.js","kb":85,"loadMs":1.1,"coldMs":44.7,"warmMs":7.2,"retainedMB":6,"rssMB":192}
+{"parser":"typescript createSourceFile","file":"lodash.min.js","kb":71,"loadMs":0.8,"coldMs":33.8,"warmMs":5.9,"retainedMB":5.5,"rssMB":196}
+{"parser":"typescript createSourceFile","file":"jquery.js","kb":279,"loadMs":0.8,"coldMs":36.8,"warmMs":7.1,"retainedMB":6.2,"rssMB":194}
+{"parser":"typescript createSourceFile","file":"lodash.js","kb":531,"loadMs":0.8,"coldMs":60.2,"warmMs":14.5,"retainedMB":8.3,"rssMB":264}
+{"parser":"typescript createSourceFile","file":"three.module.js","kb":647,"loadMs":0.8,"coldMs":66.1,"warmMs":14,"retainedMB":11.5,"rssMB":277}
+{"parser":"typescript createSourceFile","file":"three.core.js","kb":1424,"loadMs":0.9,"coldMs":130.1,"warmMs":43.1,"retainedMB":30,"rssMB":348}
+{"parser":"typescript createSourceFile","file":"broken-midedit.js","kb":279,"loadMs":0.9,"coldMs":39,"warmMs":7.5,"retainedMB":6.2,"rssMB":195}

@@ -1,0 +1,120 @@
+{"parser":"acorn","file":"broken-midedit.js","result":"THROWS: Unexpected token (5342:4)"}
+{"parser":"acorn","file":"broken-string.js","result":"THROWS: Unexpected keyword 'var' (5342:1)"}
+{"parser":"acorn","file":"broken-truncated.js","result":"THROWS: Unexpected token (6361:14)"}
+{"parser":"acorn","file":"jquery.js","errors":0,"ids":9671,"bad":0,"scopes":1696,"through":186,"offsetsOK":true}
+{"parser":"acorn","file":"jquery.min.js","errors":0,"ids":9400,"bad":0,"scopes":740,"through":102,"offsetsOK":true}
+{"parser":"acorn","file":"lodash.js","errors":0,"ids":11777,"bad":0,"scopes":1328,"through":40,"offsetsOK":true}
+{"parser":"acorn","file":"lodash.min.js","errors":0,"ids":11680,"bad":0,"scopes":827,"through":40,"offsetsOK":true}
+{"parser":"acorn","file":"story.js","errors":0,"ids":435,"bad":0,"scopes":64,"through":188,"offsetsOK":true}
+{"parser":"acorn","file":"three.core.js","errors":0,"ids":33120,"bad":0,"scopes":4432,"through":1577,"offsetsOK":true}
+{"parser":"acorn","file":"three.module.js","errors":0,"ids":17073,"bad":0,"scopes":2060,"through":365,"offsetsOK":true}
+{"parser":"acorn-loose","file":"broken-midedit.js","errors":0,"ids":9673,"bad":0,"scopes":1696,"through":787,"offsetsOK":true}
+{"parser":"acorn-loose","file":"broken-string.js","errors":0,"ids":9673,"bad":1,"scopes":1696,"through":785,"offsetsOK":true}
+{"parser":"acorn-loose","file":"broken-truncated.js","errors":0,"ids":5709,"bad":0,"scopes":1015,"through":102,"offsetsOK":true}
+{"parser":"acorn-loose","file":"jquery.js","errors":0,"ids":9671,"bad":0,"scopes":1696,"through":186,"offsetsOK":true}
+{"parser":"acorn-loose","file":"jquery.min.js","errors":0,"ids":9400,"bad":0,"scopes":740,"through":102,"offsetsOK":true}
+{"parser":"acorn-loose","file":"lodash.js","errors":0,"ids":11777,"bad":0,"scopes":1328,"through":40,"offsetsOK":true}
+{"parser":"acorn-loose","file":"lodash.min.js","errors":0,"ids":11682,"bad":2,"scopes":827,"through":869,"offsetsOK":false}
+{"parser":"acorn-loose","file":"story.js","errors":0,"ids":435,"bad":0,"scopes":64,"through":188,"offsetsOK":true}
+{"parser":"acorn-loose","file":"three.core.js","errors":0,"ids":33120,"bad":0,"scopes":4432,"through":1577,"offsetsOK":true}
+{"parser":"acorn-loose","file":"three.module.js","errors":0,"ids":17073,"bad":0,"scopes":2060,"through":365,"offsetsOK":true}
+{"parser":"acorn→loose (parseJS)","file":"broken-midedit.js","errors":1,"firstError":"Unexpected token (5342:4)","ids":9673,"bad":0,"scopes":1696,"through":787,"offsetsOK":true}
+{"parser":"acorn→loose (parseJS)","file":"broken-string.js","errors":1,"firstError":"Unexpected keyword 'var' (5342:1)","ids":9673,"bad":1,"scopes":1696,"through":785,"offsetsOK":true}
+{"parser":"acorn→loose (parseJS)","file":"broken-truncated.js","errors":1,"firstError":"Unexpected token (6361:14)","ids":5709,"bad":0,"scopes":1015,"through":102,"offsetsOK":true}
+{"parser":"acorn→loose (parseJS)","file":"jquery.js","errors":0,"ids":9671,"bad":0,"scopes":1696,"through":186,"offsetsOK":true}
+{"parser":"acorn→loose (parseJS)","file":"jquery.min.js","errors":0,"ids":9400,"bad":0,"scopes":740,"through":102,"offsetsOK":true}
+{"parser":"acorn→loose (parseJS)","file":"lodash.js","errors":0,"ids":11777,"bad":0,"scopes":1328,"through":40,"offsetsOK":true}
+{"parser":"acorn→loose (parseJS)","file":"lodash.min.js","errors":0,"ids":11680,"bad":0,"scopes":827,"through":40,"offsetsOK":true}
+{"parser":"acorn→loose (parseJS)","file":"story.js","errors":0,"ids":435,"bad":0,"scopes":64,"through":188,"offsetsOK":true}
+{"parser":"acorn→loose (parseJS)","file":"three.core.js","errors":0,"ids":33120,"bad":0,"scopes":4432,"through":1577,"offsetsOK":true}
+{"parser":"acorn→loose (parseJS)","file":"three.module.js","errors":0,"ids":17073,"bad":0,"scopes":2060,"through":365,"offsetsOK":true}
+{"parser":"espree","file":"broken-midedit.js","result":"THROWS: Unexpected token ."}
+{"parser":"espree","file":"broken-string.js","result":"THROWS: Unexpected keyword 'var'"}
+{"parser":"espree","file":"broken-truncated.js","result":"THROWS: Unexpected token"}
+{"parser":"espree","file":"jquery.js","errors":0,"ids":9671,"bad":0,"scopes":1696,"through":186,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"espree","file":"jquery.min.js","errors":0,"ids":9400,"bad":0,"scopes":740,"through":102,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"espree","file":"lodash.js","errors":0,"ids":11777,"bad":0,"scopes":1328,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"espree","file":"lodash.min.js","errors":0,"ids":11680,"bad":0,"scopes":827,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"espree","file":"story.js","errors":0,"ids":435,"bad":0,"scopes":64,"through":188,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"espree","file":"three.core.js","errors":0,"ids":33120,"bad":0,"scopes":4432,"through":1577,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"espree","file":"three.module.js","errors":0,"ids":17073,"bad":0,"scopes":2060,"through":365,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"meriyah","file":"broken-midedit.js","result":"THROWS: [5342:4-5342:5]: Unexpected character after object literal property name"}
+{"parser":"meriyah","file":"broken-string.js","result":"THROWS: [5342:5-5342:6]: Unexpected token"}
+{"parser":"meriyah","file":"broken-truncated.js","result":"THROWS: [6361:2-6361:14]: Unexpected character after object literal property name"}
+{"parser":"meriyah","file":"jquery.js","errors":0,"ids":9671,"bad":0,"scopes":1696,"through":186,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"meriyah","file":"jquery.min.js","errors":0,"ids":9400,"bad":0,"scopes":740,"through":102,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"meriyah","file":"lodash.js","errors":0,"ids":11777,"bad":0,"scopes":1328,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"meriyah","file":"lodash.min.js","errors":0,"ids":11680,"bad":0,"scopes":827,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"meriyah","file":"story.js","errors":0,"ids":435,"bad":0,"scopes":64,"through":188,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"meriyah","file":"three.core.js","errors":0,"ids":33120,"bad":0,"scopes":4432,"through":1577,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"meriyah","file":"three.module.js","errors":0,"ids":17073,"bad":0,"scopes":2060,"through":365,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native)","file":"broken-midedit.js","errors":1,"firstError":"Expected `,` or `}` but found `.`","ids":0,"bad":0,"scopes":1,"through":0,"offsetsOK":true,"throughDiffVsAcorn":"0+/787-"}
+{"parser":"oxc-parser (native)","file":"broken-string.js","errors":1,"firstError":"Expected `:` but found `Identifier`","ids":0,"bad":0,"scopes":1,"through":0,"offsetsOK":true,"throughDiffVsAcorn":"0+/785-"}
+{"parser":"oxc-parser (native)","file":"broken-truncated.js","errors":1,"firstError":"Expected `}` but found `EOF`","ids":0,"bad":0,"scopes":1,"through":0,"offsetsOK":true,"throughDiffVsAcorn":"0+/102-"}
+{"parser":"oxc-parser (native)","file":"jquery.js","errors":0,"ids":9671,"bad":0,"scopes":1696,"through":186,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native)","file":"jquery.min.js","errors":0,"ids":9400,"bad":0,"scopes":740,"through":102,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native)","file":"lodash.js","errors":0,"ids":11777,"bad":0,"scopes":1328,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native)","file":"lodash.min.js","errors":0,"ids":11680,"bad":0,"scopes":827,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native)","file":"story.js","errors":0,"ids":435,"bad":0,"scopes":64,"through":188,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native)","file":"three.core.js","errors":0,"ids":33120,"bad":0,"scopes":4432,"through":1577,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native)","file":"three.module.js","errors":0,"ids":17073,"bad":0,"scopes":2060,"through":365,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native, raw transfer)","file":"broken-midedit.js","errors":1,"firstError":"Expected `,` or `}` but found `.`","ids":0,"bad":0,"scopes":1,"through":0,"offsetsOK":true,"throughDiffVsAcorn":"0+/787-"}
+{"parser":"oxc-parser (native, raw transfer)","file":"broken-string.js","errors":1,"firstError":"Expected `:` but found `Identifier`","ids":0,"bad":0,"scopes":1,"through":0,"offsetsOK":true,"throughDiffVsAcorn":"0+/785-"}
+{"parser":"oxc-parser (native, raw transfer)","file":"broken-truncated.js","errors":1,"firstError":"Expected `}` but found `EOF`","ids":0,"bad":0,"scopes":1,"through":0,"offsetsOK":true,"throughDiffVsAcorn":"0+/102-"}
+{"parser":"oxc-parser (native, raw transfer)","file":"jquery.js","errors":0,"ids":9671,"bad":0,"scopes":1696,"through":186,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native, raw transfer)","file":"jquery.min.js","errors":0,"ids":9400,"bad":0,"scopes":740,"through":102,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native, raw transfer)","file":"lodash.js","errors":0,"ids":11777,"bad":0,"scopes":1328,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native, raw transfer)","file":"lodash.min.js","errors":0,"ids":11680,"bad":0,"scopes":827,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native, raw transfer)","file":"story.js","errors":0,"ids":435,"bad":0,"scopes":64,"through":188,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native, raw transfer)","file":"three.core.js","errors":0,"ids":33120,"bad":0,"scopes":4432,"through":1577,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (native, raw transfer)","file":"three.module.js","errors":0,"ids":17073,"bad":0,"scopes":2060,"through":365,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (wasm)","file":"broken-midedit.js","errors":1,"firstError":"Expected `,` or `}` but found `.`","ids":0,"bad":0,"scopes":1,"through":0,"offsetsOK":true,"throughDiffVsAcorn":"0+/787-"}
+{"parser":"oxc-parser (wasm)","file":"broken-string.js","errors":1,"firstError":"Expected `:` but found `Identifier`","ids":0,"bad":0,"scopes":1,"through":0,"offsetsOK":true,"throughDiffVsAcorn":"0+/785-"}
+{"parser":"oxc-parser (wasm)","file":"broken-truncated.js","errors":1,"firstError":"Expected `}` but found `EOF`","ids":0,"bad":0,"scopes":1,"through":0,"offsetsOK":true,"throughDiffVsAcorn":"0+/102-"}
+{"parser":"oxc-parser (wasm)","file":"jquery.js","errors":0,"ids":9671,"bad":0,"scopes":1696,"through":186,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (wasm)","file":"jquery.min.js","errors":0,"ids":9400,"bad":0,"scopes":740,"through":102,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (wasm)","file":"lodash.js","errors":0,"ids":11777,"bad":0,"scopes":1328,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (wasm)","file":"lodash.min.js","errors":0,"ids":11680,"bad":0,"scopes":827,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (wasm)","file":"story.js","errors":0,"ids":435,"bad":0,"scopes":64,"through":188,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (wasm)","file":"three.core.js","errors":0,"ids":33120,"bad":0,"scopes":4432,"through":1577,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"oxc-parser (wasm)","file":"three.module.js","errors":0,"ids":17073,"bad":0,"scopes":2060,"through":365,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@babel/parser (estree, recovery)","file":"broken-midedit.js","result":"THROWS: Unexpected token, expected \",\" (5342:4)"}
+{"parser":"@babel/parser (estree, recovery)","file":"broken-string.js","result":"THROWS: Unexpected token, expected \",\" (5342:5)"}
+{"parser":"@babel/parser (estree, recovery)","file":"broken-truncated.js","result":"THROWS: Unexpected token, expected \",\" (6361:14)"}
+{"parser":"@babel/parser (estree, recovery)","file":"jquery.js","errors":0,"ids":9671,"bad":0,"scopes":1696,"through":186,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@babel/parser (estree, recovery)","file":"jquery.min.js","errors":0,"ids":9400,"bad":0,"scopes":740,"through":102,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@babel/parser (estree, recovery)","file":"lodash.js","errors":0,"ids":11777,"bad":0,"scopes":1328,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@babel/parser (estree, recovery)","file":"lodash.min.js","errors":0,"ids":11680,"bad":0,"scopes":827,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@babel/parser (estree, recovery)","file":"story.js","errors":0,"ids":435,"bad":0,"scopes":64,"through":188,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@babel/parser (estree, recovery)","file":"three.core.js","errors":0,"ids":33120,"bad":0,"scopes":4432,"through":1577,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@babel/parser (estree, recovery)","file":"three.module.js","errors":0,"ids":17073,"bad":0,"scopes":2060,"through":365,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@typescript-eslint/typescript-estree","file":"broken-midedit.js","result":"THROWS: ',' expected."}
+{"parser":"@typescript-eslint/typescript-estree","file":"broken-string.js","result":"THROWS: ':' expected."}
+{"parser":"@typescript-eslint/typescript-estree","file":"broken-truncated.js","result":"THROWS: '}' expected."}
+{"parser":"@typescript-eslint/typescript-estree","file":"jquery.js","errors":0,"ids":9671,"bad":9671,"scopes":1696,"through":186,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@typescript-eslint/typescript-estree","file":"jquery.min.js","errors":0,"ids":9400,"bad":9400,"scopes":740,"through":102,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@typescript-eslint/typescript-estree","file":"lodash.js","errors":0,"ids":11777,"bad":11777,"scopes":1328,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@typescript-eslint/typescript-estree","file":"lodash.min.js","errors":0,"ids":11680,"bad":11680,"scopes":827,"through":40,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@typescript-eslint/typescript-estree","file":"story.js","errors":0,"ids":435,"bad":435,"scopes":64,"through":188,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@typescript-eslint/typescript-estree","file":"three.core.js","errors":0,"ids":33120,"bad":33120,"scopes":4432,"through":1577,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@typescript-eslint/typescript-estree","file":"three.module.js","errors":0,"ids":17073,"bad":17073,"scopes":2060,"through":365,"offsetsOK":true,"throughDiffVsAcorn":"0+/0-"}
+{"parser":"@swc/core (native)","file":"broken-midedit.js","result":"THROWS:   x Unexpected token `.`. Expected ... , *,  (, [, :, , ?, = or an identifier\n  "}
+{"parser":"@swc/core (native)","file":"broken-string.js","result":"THROWS:   x Unexpected token `ident`. Expected ... , *,  (, [, :, , ?, = or an identifie"}
+{"parser":"@swc/core (native)","file":"broken-truncated.js","result":"THROWS:   x Unexpected token `<eof>`. Expected ... , *,  (, [, :, , ?, = or an identifie"}
+{"parser":"@swc/core (native)","file":"jquery.js","errors":0,"result":"parsed (non-ESTree AST: type=Script)"}
+{"parser":"@swc/core (native)","file":"jquery.min.js","errors":0,"result":"parsed (non-ESTree AST: type=Script)"}
+{"parser":"@swc/core (native)","file":"lodash.js","errors":0,"result":"parsed (non-ESTree AST: type=Script)"}
+{"parser":"@swc/core (native)","file":"lodash.min.js","errors":0,"result":"parsed (non-ESTree AST: type=Script)"}
+{"parser":"@swc/core (native)","file":"story.js","errors":0,"result":"parsed (non-ESTree AST: type=Script)"}
+{"parser":"@swc/core (native)","file":"three.core.js","errors":0,"result":"parsed (non-ESTree AST: type=Module)"}
+{"parser":"@swc/core (native)","file":"three.module.js","errors":0,"result":"parsed (non-ESTree AST: type=Module)"}
+{"parser":"@swc/wasm","file":"broken-midedit.js","result":"THROWS: undefined"}
+{"parser":"@swc/wasm","file":"broken-string.js","result":"THROWS: undefined"}
+{"parser":"@swc/wasm","file":"broken-truncated.js","result":"THROWS: undefined"}
+{"parser":"@swc/wasm","file":"jquery.js","errors":0,"result":"parsed (non-ESTree AST: type=Script)"}
+{"parser":"@swc/wasm","file":"jquery.min.js","errors":0,"result":"parsed (non-ESTree AST: type=Script)"}
+{"parser":"@swc/wasm","file":"lodash.js","errors":0,"result":"parsed (non-ESTree AST: type=Script)"}
+{"parser":"@swc/wasm","file":"lodash.min.js","errors":0,"result":"parsed (non-ESTree AST: type=Script)"}
+{"parser":"@swc/wasm","file":"story.js","errors":0,"result":"parsed (non-ESTree AST: type=Script)"}
+{"parser":"@swc/wasm","file":"three.core.js","errors":0,"result":"parsed (non-ESTree AST: type=Module)"}
+{"parser":"@swc/wasm","file":"three.module.js","errors":0,"result":"parsed (non-ESTree AST: type=Module)"}
