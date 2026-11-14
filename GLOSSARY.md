@@ -56,6 +56,18 @@ author controls. Recognized by being unbound within the snippet the parser was
 handed — see ADR-0003 — not by any list of known names. _Avoid_: "global", which
 names the heuristic rather than the thing.
 
+**Host global**: a global the browser or a bundled library provides (`document`,
+`location`, `$`), as opposed to JavaScript's own globals (`Math`, `parseInt`).
+`js-parser.ts` always excludes JavaScript's globals from story variables. Each
+story format decides which host globals to exclude, because the answer depends
+on how the format spells story variables. SugarCube's sigils can't collide with
+a host global, but Chapbook's bare names can (`location`, `history`).
+
+**Story-format built-in**: a name the story format itself provides (`State`,
+`setup`, SugarCube's `either()` and `visited()`). Not a host global. Per ADR-0003
+the story-format parser decides which ones aren't story variables; it may hand
+some to `js-parser.ts` in the same exclusion set as its host globals.
+
 **Story property**: a member reached from a story variable, carried with the full
 dotted path that reaches it (`prefix` + name). A property whose path can't be
 spelled isn't a story property at all.
@@ -64,12 +76,34 @@ spelled isn't a story property at all.
 Every occurrence is indexed; the same name occurring five times is five
 occurrences, because rename must rewrite all of them.
 
-**Assignment**: an occurrence that _writes_ the name (`$x = 1`, `$x.y = 1`).
-Twine variables are never declared, so this is the only creation signal the
-parser has — which is why the story formats can force it on for constructs they
-know are writes (`<<set>>`, a setter link, a Chapbook vars section). _Avoid_:
-"definition", which implies a declaration site that Twine JavaScript doesn't
-have.
+**Callee**: an occurrence of a story property that is the function being called,
+by a call or `new` (`push` in `$arr.push(x)`). Callee-ness belongs to the
+occurrence, not the name: `$quest.find(x)` and a bare `$quest.find` read are
+indexed separately, so diagnostics can treat them differently.
+
+**Built-in JS property**: a story property whose last path segment names
+something every JavaScript value of some type already has, so a never-set
+warning would be a false positive. Two kinds: **instance properties**
+(`length`, `constructor`), exempt in any position; and **method names**
+(`push`, `map`, `keys`), exempt only on a callee. Names an author would
+naturally choose for their own data (`name`, `description`, `size`) are
+deliberately left out, even though built-ins have them. Distinct from a host
+global or story-format built-in, which are bare names, not properties.
+
+**Assignment**: an occurrence the parser _counts_ as writing the name (`$x = 1`,
+`$x.y = 1`), as evidence that the story variable gets set. Twine variables are
+never declared, so this is the only creation signal the parser has. Three things
+count: a root-level **declaration**, always; write-shaped syntax inside an
+**assignment context**; and occurrences a story format forces to be writes (the
+Chapbook vars section, SugarCube receivers). A write the parser doesn't count,
+such as `<<print $x = 1>>`, is a read. _Avoid_: "definition", which implies a
+declaration site that Twine JavaScript doesn't have.
+
+**Assignment context**: a construct whose purpose is to set state (`<<set>>`,
+`<<run>>`, a setter link), so write-shaped syntax inside it (`=`, `++`/`--`,
+destructuring and `for` targets) counts as an assignment. Outside one, an
+assignment is more often a `==` typo or a side effect buried in a read, so the
+parser under-reports. _SugarCube code calls this a setter context._
 
 **Declaration**: a JavaScript binding form — `var`/`let`/`const`, `function`,
 `class`. Unambiguous where an assignment isn't, so a root-level declaration is an
