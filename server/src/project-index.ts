@@ -7,9 +7,9 @@ import {
     DisableDiagnosticTag,
     StoryFormat,
 } from "@tt3/shared";
-import { TwineDiagnostic } from "./diagnostics";
 import { EmbeddedDocument } from "./embedded-languages";
 import { SemanticToken } from "./semantic-tokens";
+import { Label, TwineDiagnostic } from "./types";
 import { positionInRange, rangeInRange } from "./utilities";
 
 /**
@@ -20,17 +20,30 @@ export interface Kind {
 }
 
 /**
- * A label, which has a name and a location.
+ * Tracks whether it's functioning as a callee or not.
  */
-export interface Label {
-    contents: string;
-    location: Location;
+export interface Callable {
+    /**
+     * For properties, whether the property is the callee of a call or `new`.
+     * On `References`, true only if every location is such a callee. The
+     * indexer keeps callee and non-callee occurrences of a name in separate
+     * `References`, so a document can have two entries with the same contents.
+     */
+    isCallee?: boolean;
+}
+
+/**
+ * Spread-ready `isCallee` flag that's absent unless true, keeping indexed
+ * shapes sparse.
+ */
+export function calleeFlag(source: Callable): Callable {
+    return source.isCallee ? { isCallee: true } : {};
 }
 
 /**
  * A label with a number that identifies the kind of label it is.
  */
-export interface ProjSymbol extends Label, Kind {}
+export interface ProjSymbol extends Label, Kind, Callable {}
 
 /**
  * Kind of a Twine symbol.
@@ -44,7 +57,7 @@ export enum TwineSymbolKind {
 /**
  * References, which have contents, locations, and an identifier for its kind.
  */
-export interface References extends Kind {
+export interface References extends Kind, Callable {
     contents: string;
     locations: Location[];
 }
@@ -325,6 +338,18 @@ export interface ProjectIndex {
      * @param uri URI of document to remove.
      */
     removeDocument(uri: string): void;
+
+    /**
+     * Rename a document in the project index.
+     *
+     * If the document doesn't exist in the index, nothing happens.
+     *
+     * If the document is renamed to an already-existing document,
+     * then the already-existing document's information is overwritten.
+     * @param oldUri Original URI of the renamed document.
+     * @param newUri New URI of the renamed document.
+     */
+    removeDocument(oldUri: string, newUri: string): void;
 }
 
 type RepositoryPerKind<T> = Record<number, T[]>;
@@ -594,11 +619,11 @@ export class Index implements ProjectIndex {
         for (const referencesPerKind of Object.values(this._references)) {
             const localReferences = referencesPerKind[references.kind];
             if (localReferences !== undefined) {
-                const ref = localReferences.find(
-                    (ref) => ref.contents === references.contents,
-                );
-                if (ref !== undefined) {
-                    references.locations.push(...ref.locations);
+                // A name can have both a callee and a non-callee entry
+                for (const ref of localReferences) {
+                    if (ref.contents === references.contents) {
+                        references.locations.push(...ref.locations);
+                    }
                 }
             }
         }
@@ -689,13 +714,58 @@ export class Index implements ProjectIndex {
         delete this._decorationRanges[uri];
         delete this._parseErrors[uri];
         delete this._disabledDiagnosticRanges[uri];
+        delete this._cachedPassageNames[uri];
+        delete this._cachedPassageTags[uri];
         if (uri === this._storyTitleUri) {
             this._storyTitle = undefined;
         }
         if (uri === this._storyDataUri) {
             this._storyData = undefined;
         }
-        delete this._cachedPassageNames[uri];
-        delete this._cachedPassageTags[uri];
+    }
+
+    renameDocument(oldUri: string, newUri: string): void {
+        if (oldUri in this._passages) {
+            this._passages[newUri] = this._passages[oldUri];
+        }
+        if (oldUri in this._definitions) {
+            this._definitions[newUri] = this._definitions[oldUri];
+        }
+        if (oldUri in this._references) {
+            this._references[newUri] = this._references[oldUri];
+        }
+        if (oldUri in this._embeddedDocuments) {
+            this._embeddedDocuments[newUri] = this._embeddedDocuments[oldUri];
+        }
+        if (oldUri in this._semanticTokens) {
+            this._semanticTokens[newUri] = this._semanticTokens[oldUri];
+        }
+        if (oldUri in this._foldingRanges) {
+            this._foldingRanges[newUri] = this._foldingRanges[oldUri];
+        }
+        if (oldUri in this._decorationRanges) {
+            this._decorationRanges[newUri] = this._decorationRanges[oldUri];
+        }
+        if (oldUri in this._parseErrors) {
+            this._parseErrors[newUri] = this._parseErrors[oldUri];
+        }
+        if (oldUri in this._disabledDiagnosticRanges) {
+            this._disabledDiagnosticRanges[newUri] =
+                this._disabledDiagnosticRanges[oldUri];
+        }
+        if (oldUri in this._cachedPassageNames) {
+            this._cachedPassageNames[newUri] = this._cachedPassageNames[oldUri];
+        }
+        if (oldUri in this._cachedPassageTags) {
+            this._cachedPassageTags[newUri] = this._cachedPassageTags[oldUri];
+        }
+        if (oldUri === this._storyTitleUri) {
+            this._storyTitleUri = newUri;
+        }
+        if (oldUri === this._storyDataUri) {
+            this._storyDataUri = newUri;
+        }
+
+        this.removeDocument(oldUri);
     }
 }

@@ -884,6 +884,39 @@ describe("Project Index", () => {
             });
         });
 
+        it("should return references from both callee and non-callee entries for the same name", () => {
+            const propertyReferences = [
+                {
+                    contents: "$arr.push",
+                    locations: [
+                        Location.create("fake-uri", Range.create(1, 2, 1, 6)),
+                    ],
+                    kind: 99,
+                },
+                {
+                    contents: "$arr.push",
+                    locations: [
+                        Location.create("fake-uri", Range.create(3, 4, 3, 8)),
+                    ],
+                    kind: 99,
+                    isCallee: true,
+                },
+            ];
+            const index = new uut.Index();
+            index.setReferences("fake-uri", propertyReferences);
+
+            const result = index.getReferencesToSymbolAt(
+                "fake-uri",
+                Position.create(3, 5),
+                false,
+            );
+
+            expect(result?.locations).to.have.deep.members([
+                Location.create("fake-uri", Range.create(1, 2, 1, 6)),
+                Location.create("fake-uri", Range.create(3, 4, 3, 8)),
+            ]);
+        });
+
         it("should return references for a position located at a reference to it, including the definition", () => {
             const passages = [
                 buildPassage({
@@ -1650,6 +1683,330 @@ describe("Project Index", () => {
             const result = index.getParseErrors("storytitle-uri");
 
             expect(result).to.eql(errors);
+        });
+    });
+
+    describe("Renaming Documents", () => {
+        it("should keep the story title if a renamed document contained it", () => {
+            const index = new uut.Index();
+            index.setStoryTitle("Title!", "storytitle-uri");
+
+            index.renameDocument("storytitle-uri", "newstorytitle-uri");
+            const result = index.getStoryTitle();
+
+            expect(result).to.eql("Title!");
+        });
+
+        it("should keep story data if a deleted document contained it", () => {
+            const index = new uut.Index();
+            index.setStoryData(
+                {
+                    ifid: "fake-ifid",
+                },
+                "storydata-uri",
+            );
+
+            index.renameDocument("storydata-uri", "newstorydata-uri");
+            const result = index.getStoryData();
+
+            expect(result).to.eql({ ifid: "fake-ifid" });
+        });
+
+        it("should keep passages from a renamed document", () => {
+            const passages1 = [
+                buildPassage({ label: "F1 P1" }),
+                buildPassage({ label: "F1 P2" }),
+            ];
+            const index = new uut.Index();
+            index.setPassages("file1", passages1);
+
+            index.renameDocument("file1", "newfile1");
+            const result = index.getPassageNames();
+
+            expect(result).to.eql(["F1 P1", "F1 P2"]);
+        });
+
+        it("should overwrite passages for a document renamed to an already-existing document", () => {
+            const passages1 = [
+                buildPassage({ label: "F1 P1" }),
+                buildPassage({ label: "F1 P2" }),
+            ];
+            const passages2 = [
+                buildPassage({ label: "F2 P1" }),
+                buildPassage({ label: "F2 P2" }),
+            ];
+            const index = new uut.Index();
+            index.setPassages("file1", passages1);
+            index.setPassages("file2", passages2);
+
+            index.renameDocument("file1", "file2");
+            const result = index.getPassageNames();
+
+            expect(result).to.eql(["F1 P1", "F1 P2"]);
+        });
+
+        it("should keep embedded documents for a renamed document", () => {
+            const docs: EmbeddedDocument[] = [
+                EmbeddedDocument.create(
+                    "fake-sub-uri",
+                    "json",
+                    '{ "prop": 7 }',
+                    7,
+                    TextDocument.create("fake-uri", "", 2, "fake-content"),
+                ),
+            ];
+            const index = new uut.Index();
+            index.setEmbeddedDocuments("fake-uri", docs);
+
+            index.renameDocument("fake-uri", "other-uri");
+            const result1 = index.getEmbeddedDocuments("fake-uri");
+            const result2 = index.getEmbeddedDocuments("other-uri");
+
+            expect(result1).to.be.empty;
+            expect(result2.length).to.equal(1);
+            expect(result2[0].document).to.eql(
+                TextDocument.create("fake-sub-uri", "json", 2, '{ "prop": 7 }'),
+            );
+        });
+
+        it("should overwrite embedded documents for a document renamed to an already-existing document", () => {
+            const docs1: EmbeddedDocument[] = [
+                EmbeddedDocument.create(
+                    "fake-sub-uri",
+                    "json",
+                    '{ "prop": 7 }',
+                    7,
+                    TextDocument.create("fake-uri", "", 2, "fake-content"),
+                ),
+            ];
+            const docs2: EmbeddedDocument[] = [
+                EmbeddedDocument.create(
+                    "other-sub-uri",
+                    "css",
+                    "selector: whatever",
+                    12,
+                    TextDocument.create(
+                        "other-uri",
+                        "",
+                        2,
+                        "other-fake-content",
+                    ),
+                ),
+            ];
+            const index = new uut.Index();
+            index.setEmbeddedDocuments("fake-uri", docs1);
+            index.setEmbeddedDocuments("other-uri", docs2);
+
+            index.renameDocument("fake-uri", "other-uri");
+            const result1 = index.getEmbeddedDocuments("fake-uri");
+            const result2 = index.getEmbeddedDocuments("other-uri");
+
+            expect(result1).to.be.empty;
+            expect(result2.length).to.equal(1);
+            expect(result2[0].document).to.eql(
+                TextDocument.create("fake-sub-uri", "json", 2, '{ "prop": 7 }'),
+            );
+        });
+
+        it("should keep definitions for a renamed document", () => {
+            const definitions = [
+                {
+                    contents: "one",
+                    location: Location.create(
+                        "file1",
+                        Range.create(1, 2, 3, 4),
+                    ),
+                    kind: 1,
+                },
+            ];
+            const index = new uut.Index();
+            index.setDefinitions("file1", definitions);
+
+            index.renameDocument("file1", "file2");
+            const result1 = index.getDefinitions("file1", 1);
+            const result2 = index.getDefinitions("file2", 1);
+
+            expect(result1).to.be.undefined;
+            expect(result2).to.eql(definitions);
+        });
+
+        it("should overwrite definitions for a document renamed to an already-existing document", () => {
+            const definitions1 = [
+                {
+                    contents: "one",
+                    location: Location.create(
+                        "file1",
+                        Range.create(1, 2, 3, 4),
+                    ),
+                    kind: 1,
+                },
+            ];
+            const definitions2 = [
+                {
+                    contents: "two",
+                    location: Location.create(
+                        "file2",
+                        Range.create(5, 6, 7, 8),
+                    ),
+                    kind: 1,
+                },
+            ];
+            const index = new uut.Index();
+            index.setDefinitions("file1", definitions1);
+            index.setDefinitions("file2", definitions2);
+
+            index.renameDocument("file1", "file2");
+            const result1 = index.getDefinitions("file1", 1);
+            const result2 = index.getDefinitions("file2", 1);
+
+            expect(result1).to.be.undefined;
+            expect(result2).to.eql(definitions1);
+        });
+
+        it("should keep references for a renamed document", () => {
+            const references = [
+                {
+                    contents: "one",
+                    locations: [
+                        Location.create("file1", Range.create(1, 2, 3, 4)),
+                    ],
+                    kind: 1,
+                },
+            ];
+            const index = new uut.Index();
+            index.setReferences("file1", references);
+
+            index.renameDocument("file1", "file2");
+            const result1 = index.getReferences("file1", 1);
+            const result2 = index.getReferences("file2", 1);
+
+            expect(result1).to.be.undefined;
+            expect(result2).to.eql(references);
+        });
+
+        it("should overwrite references for a document renamed to an already-existing document", () => {
+            const references1 = [
+                {
+                    contents: "one",
+                    locations: [
+                        Location.create("file1", Range.create(1, 2, 3, 4)),
+                    ],
+                    kind: 1,
+                },
+            ];
+            const references2 = [
+                {
+                    contents: "two",
+                    locations: [
+                        Location.create("file2", Range.create(5, 6, 7, 8)),
+                    ],
+                    kind: 1,
+                },
+            ];
+            const index = new uut.Index();
+            index.setReferences("file1", references1);
+            index.setReferences("file2", references2);
+
+            index.renameDocument("file1", "file2");
+            const result1 = index.getReferences("file1", 1);
+            const result2 = index.getReferences("file2", 1);
+
+            expect(result1).to.be.undefined;
+            expect(result2).to.eql(references1);
+        });
+
+        it("should keep tokens for a renamed document", () => {
+            const fakeTokens: SemanticToken[] = [
+                {
+                    line: 1,
+                    char: 2,
+                    length: 3,
+                    tokenModifiers: [1],
+                    tokenType: 2,
+                },
+            ];
+            const index = new uut.Index();
+            index.setSemanticTokens("fake-uri", fakeTokens);
+
+            index.renameDocument("fake-uri", "other-uri");
+            const result1 = index.getSemanticTokens("fake-uri");
+            const result2 = index.getSemanticTokens("other-uri");
+
+            expect(result1).to.be.empty;
+            expect(result2).to.eql(fakeTokens);
+        });
+
+        it("should keep folding ranges for a renamed document", () => {
+            const fakeRanges = [
+                Range.create(1, 2, 3, 4),
+                Range.create(5, 6, 7, 8),
+            ];
+            const index = new uut.Index();
+            index.setFoldingRanges("fake-uri", fakeRanges);
+
+            index.renameDocument("fake-uri", "other-uri");
+            const result1 = index.getFoldingRanges("fake-uri");
+            const result2 = index.getFoldingRanges("other-uri");
+
+            expect(result1).to.be.empty;
+            expect(result2).to.eql(fakeRanges);
+        });
+
+        it("should keep decoration ranges for a renamed document", () => {
+            const fakeRanges = [
+                { type: 1, range: Range.create(1, 2, 3, 4) },
+                { type: 1, range: Range.create(5, 6, 7, 8) },
+            ];
+            const index = new uut.Index();
+            index.setDecorationRanges("fake-uri", fakeRanges);
+
+            index.renameDocument("fake-uri", "other-uri");
+            const result1 = index.getDecorationRanges("fake-uri");
+            const result2 = index.getDecorationRanges("other-uri");
+
+            expect(result1).to.be.empty;
+            expect(result2).to.eql(fakeRanges);
+        });
+
+        it("should keep parse errors for a renamed document", () => {
+            const errors = [
+                Diagnostic.create(Range.create(1, 1, 2, 2), "Problem 1"),
+                Diagnostic.create(Range.create(3, 3, 4, 4), "Another problem"),
+            ];
+            const index = new uut.Index();
+            index.setParseErrors("storytitle-uri", errors);
+
+            index.renameDocument("storytitle-uri", "other-uri");
+            const result1 = index.getParseErrors("storytitle-uri");
+            const result2 = index.getParseErrors("other-uri");
+
+            expect(result1).to.be.empty;
+            expect(result2).to.eql(errors);
+        });
+
+        it("should keep disabled diagnostic ranges for a renamed document", () => {
+            const index = new uut.Index();
+            index.setDisabledDiagnosticRanges("storytitle-uri", {
+                [DiagnosticCodes.MissingPassage]: [
+                    Range.create(2, 1, 3, 1),
+                    Range.create(5, 1, 6, 1),
+                ],
+            });
+
+            index.renameDocument("storytitle-uri", "other-uri");
+            const result1 = index.diagnosticIsDisabled(
+                "storytitle-uri",
+                DiagnosticCodes.MissingPassage,
+                Range.create(2, 1, 2, 4),
+            );
+            const result2 = index.diagnosticIsDisabled(
+                "other-uri",
+                DiagnosticCodes.MissingPassage,
+                Range.create(2, 1, 2, 4),
+            );
+
+            expect(result1).to.be.false;
+            expect(result2).to.be.true;
         });
     });
 });
