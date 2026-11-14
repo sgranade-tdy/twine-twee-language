@@ -1,16 +1,32 @@
+import { TextDocument } from "vscode-languageserver-textdocument";
+
 import { isTweeFile } from "@tt3/shared";
 import { IndexingQueue } from "./indexing-queue";
-import { Index } from "./project-index";
+import { Index, ScriptFileRole } from "./project-index";
+
+/** How long to wait after the last `.js` edit before re-parsing. */
+export const scriptReparseDebounceMs = 300;
 
 /**
  * Everything the tracker needs from the outside world.
  */
 export interface WorkspaceFileTrackerDeps {
-    index: Pick<Index, "removeDocument" | "renameDocument">;
+    index: Pick<
+        Index,
+        "removeDocument" | "renameDocument" | "getScriptFileRole"
+    >;
     queue: Pick<IndexingQueue, "indexFile">;
     processAllOpenDocuments(): Promise<void>;
     parseMacroFile(uri: string): Promise<void>;
     onMacroChanges(): void;
+    /** Re-index an open `.js` buffer. */
+    indexScriptFile(document: TextDocument, role: ScriptFileRole): void;
+    /** Re-validate every open Twee document. */
+    revalidateOpenTweeDocuments(): Promise<void>;
+    timers: {
+        setTimeout(cb: () => void, ms: number): unknown;
+        clearTimeout(handle: unknown): void;
+    };
 }
 
 /**
@@ -25,7 +41,51 @@ export interface WatchedFileChange {
  * Handles watched-file and file-operation events.
  */
 export class WorkspaceFileTracker {
+    private pendingScripts = new Map<string, TextDocument>();
+    private scriptTimer: unknown = undefined;
+
     constructor(private readonly deps: WorkspaceFileTrackerDeps) {}
+
+    /**
+     * Whether a URI is a resolved script file.
+     */
+    isScriptFile(uri: string): boolean {
+        return this.deps.index.getScriptFileRole(uri) !== undefined;
+    }
+
+    /**
+     * Note an edit to an open resolved `.js` buffer; it's re-parsed after a debounce.
+     */
+    handleScriptBufferChanged(document: TextDocument): void {
+        this.pendingScripts.set(document.uri, document);
+        if (this.scriptTimer !== undefined) {
+            this.deps.timers.clearTimeout(this.scriptTimer);
+        }
+        this.scriptTimer = this.deps.timers.setTimeout(
+            () => this.flushPendingScripts(),
+            scriptReparseDebounceMs,
+        );
+    }
+
+    /**
+     * Synchronously re-parse every pending `.js` buffer, then revalidate open Twee documents.
+     */
+    flushPendingScripts(): void {
+        if (this.scriptTimer !== undefined) {
+            this.deps.timers.clearTimeout(this.scriptTimer);
+            this.scriptTimer = undefined;
+        }
+        if (this.pendingScripts.size === 0) return;
+        const pending = [...this.pendingScripts.values()];
+        this.pendingScripts.clear();
+        for (const doc of pending) {
+            const role = this.deps.index.getScriptFileRole(doc.uri);
+            if (role !== undefined) {
+                this.deps.indexScriptFile(doc, role);
+            }
+        }
+        void this.deps.revalidateOpenTweeDocuments();
+    }
 
     /**
      * Handle watcher events.

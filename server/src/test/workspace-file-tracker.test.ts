@@ -1,5 +1,7 @@
 import { expect } from "chai";
 
+import { TextDocument } from "vscode-languageserver-textdocument";
+
 import { Index } from "../project-index";
 import {
     WorkspaceFileTracker,
@@ -9,6 +11,7 @@ import {
 function build(overrides: Partial<WorkspaceFileTrackerDeps> = {}) {
     const calls: string[] = [];
     const queued: string[] = [];
+    const timers: { cb: () => void; ms: number; cancelled: boolean }[] = [];
     const index = new Index();
     const deps: WorkspaceFileTrackerDeps = {
         index,
@@ -16,9 +19,29 @@ function build(overrides: Partial<WorkspaceFileTrackerDeps> = {}) {
         processAllOpenDocuments: async () => void calls.push("processAll"),
         parseMacroFile: async (uri) => void calls.push(`macro:${uri}`),
         onMacroChanges: () => void calls.push("macroChanges"),
+        indexScriptFile: (doc) => void calls.push(`script:${doc.uri}`),
+        revalidateOpenTweeDocuments: async () => void calls.push("revalidate"),
+        timers: {
+            setTimeout: (cb, ms) => {
+                const handle = { cb, ms, cancelled: false };
+                timers.push(handle);
+                return handle;
+            },
+            clearTimeout: (h) => {
+                (h as { cancelled: boolean }).cancelled = true;
+            },
+        },
         ...overrides,
     };
-    return { tracker: new WorkspaceFileTracker(deps), calls, queued, index };
+    const fire = () =>
+        timers.filter((t) => !t.cancelled).forEach((t) => t.cb());
+    return {
+        tracker: new WorkspaceFileTracker(deps),
+        calls,
+        queued,
+        index,
+        fire,
+    };
 }
 
 describe("Workspace file tracker", () => {
@@ -81,5 +104,41 @@ describe("Workspace file tracker", () => {
         ]);
 
         expect([...index.getIndexedUris()].sort()).to.eql(["file:///c.tw"]);
+    });
+
+    describe("open .js buffers", () => {
+        const doc = TextDocument.create("file:///a.js", "javascript", 1, "x");
+
+        it("should coalesce a burst of edits into one re-parse after the debounce", () => {
+            const { tracker, calls, index, fire } = build();
+            index.setScriptFileRole(doc.uri, "story-script");
+
+            tracker.handleScriptBufferChanged(doc);
+            tracker.handleScriptBufferChanged(doc);
+            tracker.handleScriptBufferChanged(doc);
+            expect(calls).to.eql([]);
+            fire();
+
+            expect(calls).to.eql(["script:file:///a.js", "revalidate"]);
+        });
+
+        it("should flush pending parses synchronously", () => {
+            const { tracker, calls, index, fire } = build();
+            index.setScriptFileRole(doc.uri, "story-script");
+
+            tracker.handleScriptBufferChanged(doc);
+            tracker.flushPendingScripts();
+            fire();
+
+            expect(calls).to.eql(["script:file:///a.js", "revalidate"]);
+        });
+
+        it("should do nothing when flushing with nothing pending", () => {
+            const { tracker, calls } = build();
+
+            tracker.flushPendingScripts();
+
+            expect(calls).to.eql([]);
+        });
     });
 });
