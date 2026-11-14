@@ -58,6 +58,7 @@ import {
     generateSymbols,
 } from "./structure";
 import { generateDiagnostics } from "./validator";
+import { IndexingQueue } from "./indexing-queue";
 import { WorkspaceFileTracker } from "./workspace-file-tracker";
 import { getSugarCubeMacroInfo } from "./passage-text-parsers/sugarcube";
 import {
@@ -78,7 +79,7 @@ let hasCompletionListItemDefaults = false;
 let hasDiagnosticRelatedInformationCapability = false;
 let hasPrepareProviderCapability = false;
 
-const fileTracker = new WorkspaceFileTracker({
+const indexingQueue = new IndexingQueue({
     clock: {
         now: () => Date.now(),
         setInterval: (cb, ms) => setInterval(cb, ms),
@@ -106,6 +107,14 @@ const fileTracker = new WorkspaceFileTracker({
     indexingComplete: () =>
         void connection.sendNotification(CustomMessages.IndexingComplete),
     logError: (message) => connection.console.error(message),
+});
+
+const fileTracker = new WorkspaceFileTracker({
+    index: projectIndex,
+    queue: indexingQueue,
+    processAllOpenDocuments: () => processAllOpenDocuments(),
+    parseMacroFile: (uri) => parseT3LTMacroFile(uri),
+    onMacroChanges: () => onSCMacroChanges(),
 });
 
 connection.onInitialize((params: InitializeParams) => {
@@ -214,10 +223,10 @@ connection.onInitialized(async () => {
     }
 
     // Set up the heartbeat
-    fileTracker.start();
+    indexingQueue.start();
 
     // Index all Twee files in the workspace
-    fileTracker.indexWorkspace();
+    indexingQueue.indexWorkspace();
 });
 
 // Diagnostics -- pull interface
@@ -330,7 +339,7 @@ connection.onHover(
 );
 
 connection.onNotification(CustomMessages.RequestReindex, () => {
-    fileTracker.indexWorkspace();
+    indexingQueue.indexWorkspace();
 });
 
 connection.onNotification(CustomMessages.RequestDecorationRanges, (uri) => {
@@ -380,7 +389,7 @@ connection.onRequest("textDocument/semanticTokens/full", (params) => {
 });
 
 connection.onShutdown(() => {
-    fileTracker.stop();
+    indexingQueue.stop();
 });
 
 /**
@@ -440,7 +449,7 @@ async function parseTextDocument(
     ) {
         onStoryFormatChange(newStoryFormat);
         if (reindexOnStoryFormatChange) {
-            fileTracker.indexWorkspace();
+            indexingQueue.indexWorkspace();
         }
     }
 
@@ -467,7 +476,7 @@ function onStoryFormatChange(format: StoryFormat) {
     connection.sendNotification(CustomMessages.UpdatedStoryFormat, format);
     // If the story format is SugarCube 2, we need to look for macro definition files
     if (format.format.toLowerCase() === "sugarcube") {
-        fileTracker.indexSugarCubeMacros();
+        indexingQueue.indexSugarCubeMacros();
     }
 }
 
