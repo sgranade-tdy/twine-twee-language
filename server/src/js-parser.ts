@@ -94,8 +94,8 @@ export interface JSDiagnostic {
 export interface ScriptVariableOccurrence {
     /** The variable's name, including any sigil. */
     text: string;
-    /** The text the occurrence's range covers (which may exclude the sigil). */
-    rangeText: string;
+    /** The text the occurrence's range covers, if it differs from `text` (e.g. it excludes the sigil). */
+    rangeText?: string;
     /** Offset of the range's start in the tokenized text. */
     at: number;
     assigned: boolean;
@@ -1058,11 +1058,7 @@ function computeSemanticTokens(
 /**
  * A variable occurrence found while extracting symbols, before it's turned into a `JSVariableLabel`.
  */
-interface RawVariableOccurrence {
-    text: string;
-    at: number;
-    assigned: boolean;
-}
+type RawVariableOccurrence = ScriptVariableOccurrence;
 
 /**
  * A property occurrence found while extracting symbols, before it's turned into a `JSPropertyLabel`.
@@ -1494,18 +1490,15 @@ export function tokenizeJavaScript(
               })
             : extractSymbols(ast, isGlobalName, isAssignmentContext);
         for (const variable of variables) {
-            const rangeText =
-                (variable as ScriptVariableOccurrence).rangeText ??
-                variable.text;
             tokenized.variables.push({
                 contents: variable.text,
                 location: createLocationFor(
-                    rangeText,
+                    variable.rangeText ?? variable.text,
                     offset + variable.at,
                     document,
                 ),
                 assigned: variable.assigned,
-                ...sigilFlag(variable as Sigiled),
+                ...sigilFlag(variable),
             });
         }
         for (const property of properties) {

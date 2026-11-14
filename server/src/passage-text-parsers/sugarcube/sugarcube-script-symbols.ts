@@ -16,6 +16,12 @@ type Sigil = "$" | "_";
 const identifierRegexp = /^[A-Za-z_$][\w$]*$/;
 const getSetVarKeyRegexp = /^([$_])([A-Za-z_$][\w$]*)$/;
 
+function sigilForRootName(name: string | undefined): Sigil | undefined {
+    if (name === "variables") return "$";
+    if (name === "temporary") return "_";
+    return undefined;
+}
+
 /**
  * A statically-known name along with where it sits in the source.
  */
@@ -128,10 +134,7 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
             case "MemberExpression": {
                 const member = node as acorn.MemberExpression;
                 if (!isStateObject(member.object)) return undefined;
-                const name = memberName(member)?.name;
-                if (name === "variables") return "$";
-                if (name === "temporary") return "_";
-                return undefined;
+                return sigilForRootName(memberName(member)?.name);
             }
             case "CallExpression": {
                 const call = node as acorn.CallExpression;
@@ -141,10 +144,7 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
                     !isUnbound(call.callee)
                 )
                     return undefined;
-                const name = (call.callee as acorn.Identifier).name;
-                if (name === "variables") return "$";
-                if (name === "temporary") return "_";
-                return undefined;
+                return sigilForRootName((call.callee as acorn.Identifier).name);
             }
             case "Identifier":
                 return aliasSigil(node as acorn.Identifier);
