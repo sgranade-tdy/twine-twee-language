@@ -25,8 +25,8 @@ import {
     downloadLocalStoryFormatIfNeeded,
     buildProjectDirectoriesIfNeeded,
     getBuildAndStoryUris,
-    getFilesFromSources,
 } from "./build-system";
+import { resolveFileSets } from "./file-sets";
 import { DisableDiagnosticCodeActionProvider } from "./code-actions";
 import {
     ConfigFilename,
@@ -751,15 +751,11 @@ export function startClient(context: vscode.ExtensionContext) {
 
     // Handle file requests
     client.onRequest(FindTweeFilesRequest, async () => {
-        // Get all source files that end in ".tw" or ".twee"
-        const files = (
-            await getFilesFromSources(
-                currentConfig.build.storySourceFiles,
-                currentConfig.build.ignores,
-                workspaceProvider,
-            )
-        ).filter((f) => f.path.endsWith(".tw") || f.path.endsWith(".twee"));
-        return files.map((f) => f.toString());
+        const { tweeFiles } = await resolveFileSets(
+            currentConfig,
+            workspaceProvider,
+        );
+        return tweeFiles.map((f) => f.toString());
     });
     client.onRequest(FindFilesRequest, async (glob: string) => {
         return (
