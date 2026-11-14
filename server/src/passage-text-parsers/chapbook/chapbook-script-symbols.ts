@@ -2,10 +2,12 @@ import * as acorn from "acorn";
 import * as acornWalk from "acorn-walk";
 
 import {
+    isEcmaScriptGlobal,
     ScriptPropertyOccurrence,
     ScriptSymbolExtractor,
     ScriptVariableOccurrence,
 } from "../../js-parser";
+import { browserGlobals } from "../host-globals";
 import {
     createScriptAnalysis,
     isIdentifierName,
@@ -16,6 +18,19 @@ import {
  * Chapbook names that are never story variables, even when unbound.
  */
 const excludedNames: ReadonlySet<string> = new Set(["engine", "go", "restart"]);
+
+/**
+ * Say why a bare name in Chapbook script code can never be a story variable.
+ *
+ * @param name Bare name.
+ * @returns What the name already is, or undefined if it can be a story variable.
+ */
+export function excludedBareName(name: string): string | undefined {
+    if (excludedNames.has(name)) return "a Chapbook built-in";
+    if (isEcmaScriptGlobal(name)) return "a JavaScript global";
+    if (browserGlobals.has(name)) return "a browser global";
+    return undefined;
+}
 
 /**
  * Chapbook names that are always story variables when unbound, rather than

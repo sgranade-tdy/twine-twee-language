@@ -61,9 +61,29 @@ export function sigilFlag(source: Sigiled): Sigiled {
 }
 
 /**
+ * Tracks whether a story variable is a shorthand destructuring key, such as
+ * `gold` in `const { gold } = State.variables`, where the key is also the
+ * local binding's name.
+ */
+export interface Shorthand {
+    /**
+     * True if the occurrence is a shorthand destructuring key.
+     */
+    shorthand?: boolean;
+}
+
+/**
+ * Spread-ready `shorthand` flag that's absent unless true, keeping indexed
+ * shapes sparse.
+ */
+export function shorthandFlag(source: Shorthand): Shorthand {
+    return source.shorthand ? { shorthand: true } : {};
+}
+
+/**
  * A label with a number that identifies the kind of label it is.
  */
-export interface ProjSymbol extends Label, Kind, Callable, Sigiled {}
+export interface ProjSymbol extends Label, Kind, Callable, Sigiled, Shorthand {}
 
 /**
  * Kind of a Twine symbol.
@@ -77,7 +97,7 @@ export enum TwineSymbolKind {
 /**
  * References, which have contents, locations, and an identifier for its kind.
  */
-export interface References extends Kind, Callable, Sigiled {
+export interface References extends Kind, Callable, Sigiled, Shorthand {
     contents: string;
     locations: Location[];
 }
@@ -592,6 +612,7 @@ export class Index implements ProjectIndex {
                         kind: ref.kind,
                         location: match,
                         ...sigilFlag(ref),
+                        ...shorthandFlag(ref),
                     };
                 }
             }

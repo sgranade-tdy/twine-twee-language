@@ -9,6 +9,7 @@ import {
     ScriptSymbolExtractor,
     ScriptVariableOccurrence,
 } from "../../js-parser";
+import { shorthandFlag } from "../../project-index";
 import {
     createScriptAnalysis,
     isIdentifierName,
@@ -102,7 +103,12 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
         return undefined;
     };
 
-    const addVariable = (sigil: Sigil, name: StaticName, assigned: boolean) => {
+    const addVariable = (
+        sigil: Sigil,
+        name: StaticName,
+        assigned: boolean,
+        shorthand = false,
+    ) => {
         if (!isIdentifierName(name.name)) return;
         variables.push({
             text: sigil + name.name,
@@ -110,6 +116,7 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
             at: name.start,
             assigned,
             sigilOutsideRange: true,
+            ...shorthandFlag({ shorthand }),
         });
     };
 
@@ -193,7 +200,7 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
         for (const prop of pattern.properties) {
             if (prop.type !== "Property") continue;
             const name = staticKeyName(prop.key, prop.computed);
-            if (name) addVariable(sigil, name, false);
+            if (name) addVariable(sigil, name, false, prop.shorthand);
         }
     }
 

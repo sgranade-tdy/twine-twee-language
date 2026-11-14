@@ -1,12 +1,16 @@
 import {
     DocumentUri,
+    OptionalVersionedTextDocumentIdentifier,
     Position,
     Range,
+    ResponseError,
+    TextDocumentEdit,
     TextEdit,
     WorkspaceEdit,
 } from "vscode-languageserver";
 
 import { getStoryFormatParser } from "./passage-text-parsers";
+import { RenameRefusal } from "./passage-text-parsers/types";
 import { ProjectIndex } from "./project-index";
 import { getReferencesToSymbolAt } from "./references";
 import { positionInRange } from "./utilities";
@@ -16,13 +20,20 @@ import { positionInRange } from "./utilities";
  * @param uri Document URI.
  * @param position Cursor position.
  * @param index Project index.
+ * @param getParser Function to get a story-format-specific parser.
  * @returns Range of the symbol being renamed, or undefined if no rename is possible at the position.
  */
 export function prepareRename(
     uri: string,
     position: Position,
     index: ProjectIndex,
+    getParser: typeof getStoryFormatParser = getStoryFormatParser,
 ): Range | undefined {
+    const parser = getParser(index.getStoryData()?.storyFormat);
+    if (parser?.isRenamableAt?.(uri, position, index) === false) {
+        return undefined;
+    }
+
     // Look for a definition or reference at the current location
     const symbol = index.getDefinitionAt(uri, position);
     if (symbol !== undefined) {
@@ -43,13 +54,50 @@ export function prepareRename(
 }
 
 /**
+ * How rename edits are sent to the client.
+ */
+export interface RenameTransport {
+    /**
+     * True if the client supports versioned `documentChanges`.
+     */
+    documentChanges: boolean;
+    /**
+     * Get the synced version of an open document, or null for a closed one.
+     */
+    versionOf: (uri: DocumentUri) => number | null;
+}
+
+/**
+ * Package edits for the client, as versioned document changes if it supports
+ * them, so a stale rename is rejected rather than corrupting text.
+ */
+function toWorkspaceEdit(
+    changes: { [uri: DocumentUri]: TextEdit[] },
+    transport: RenameTransport | undefined,
+): WorkspaceEdit {
+    if (!transport?.documentChanges) return { changes };
+    return {
+        documentChanges: Object.entries(changes).map(([uri, edits]) =>
+            TextDocumentEdit.create(
+                OptionalVersionedTextDocumentIdentifier.create(
+                    uri,
+                    transport.versionOf(uri),
+                ),
+                edits,
+            ),
+        ),
+    };
+}
+
+/**
  * Generate renames for a symbol.
  * @param uri Document URI.
  * @param position Cursor position.
  * @param newName New name for the symbol.
  * @param index Project index.
  * @param getParser Function to get a story-format-specific parser.
- * @returns Generated renames, or null if renames aren't possible.
+ * @param transport How to send the edits; plain `changes` if absent.
+ * @returns Generated renames, null if renames aren't possible, or an error if the rename is refused.
  */
 export function generateRenames(
     uri: string,
@@ -57,7 +105,8 @@ export function generateRenames(
     newName: string,
     index: ProjectIndex,
     getParser: typeof getStoryFormatParser = getStoryFormatParser,
-): WorkspaceEdit | null {
+    transport?: RenameTransport,
+): WorkspaceEdit | RenameRefusal | null {
     // Check the story format's changes, followed by the default index
     // Note that the story parser's function can return changes, undefined (no change
     // possible), or null (not implemented).
@@ -65,7 +114,8 @@ export function generateRenames(
     if (parser) {
         const changes = parser.generateRenamesAt(uri, position, newName, index);
         if (changes === undefined) return null;
-        if (changes !== null) return { changes: changes };
+        if (changes instanceof ResponseError) return changes;
+        if (changes !== null) return toWorkspaceEdit(changes, transport);
     }
 
     // Get locations of symbols to change
@@ -89,5 +139,5 @@ export function generateRenames(
         changes[location.uri].push(change);
     }
 
-    return { changes: changes };
+    return toWorkspaceEdit(changes, transport);
 }
