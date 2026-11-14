@@ -1,5 +1,6 @@
 import { URI, Utils as UriUtils } from "vscode-uri";
 
+import { isScriptFile, isTweeFile } from "@tt3/shared";
 import { FileType, WorkspaceProvider } from "./workspace-provider";
 
 /**
@@ -162,11 +163,6 @@ export async function resolveIncludeEntry(
     return { isDirectory, sourceUri, files };
 }
 
-function hasExtension(uri: URI, extensions: string[]): boolean {
-    const path = uri.path.toLowerCase();
-    return extensions.some((ext) => path.endsWith(ext));
-}
-
 /**
  * Resolve the project's Twee files, story script files and included scripts.
  * @param config Project config.
@@ -181,12 +177,8 @@ export async function resolveFileSets(
         config.build.ignores,
         workspaceProvider,
     );
-    const tweeFiles = sourceFiles.filter((f) =>
-        hasExtension(f, [".tw", ".twee"]),
-    );
-    const storyScriptFiles = sourceFiles.filter((f) =>
-        hasExtension(f, [".js"]),
-    );
+    const tweeFiles = sourceFiles.filter((f) => isTweeFile(f.path));
+    const storyScriptFiles = sourceFiles.filter((f) => isScriptFile(f.path));
     const storyScriptKeys = new Set(storyScriptFiles.map((f) => f.toString()));
 
     const included = new Map<string, URI>();
@@ -205,7 +197,7 @@ export async function resolveFileSets(
         }
         for (const f of files) {
             const key = f.toString();
-            if (hasExtension(f, [".js"]) && !storyScriptKeys.has(key)) {
+            if (isScriptFile(f.path) && !storyScriptKeys.has(key)) {
                 included.set(key, f);
             }
         }
