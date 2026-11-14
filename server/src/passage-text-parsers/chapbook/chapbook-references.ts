@@ -14,21 +14,31 @@ const linkedKindGroups: number[][] = [
 ];
 
 /**
+ * Does a document have its own script scope, rather than sharing the story's
+ * concatenated one? Only included scripts do.
+ */
+function hasOwnScope(index: ProjectIndex, uri: string): boolean {
+    return index.getScriptFileRole(uri) === "included-script";
+}
+
+/**
  * Get a predicate that says whether a conditional reference (a bare name in
  * script code) to a variable currently counts as a reference to it.
  *
  * It counts only if the project defines the variable somewhere and no
  * root-level declaration in a story script file or `script` passage binds that
- * name (ADR-0005).
+ * name (ADR-0005). Included scripts have their own scope, so their
+ * declarations don't count, and a reference inside one isn't affected by
+ * declarations elsewhere.
  * Evaluating this at query time means no file has to be re-parsed when another
  * file changes.
  *
  * @param index Project index.
- * @returns Predicate taking a variable's name.
+ * @returns Predicate taking a variable's name and the URI of the document that holds the reference.
  */
 export function conditionalReferenceQualifier(
     index: ProjectIndex,
-): (name: string) => boolean {
+): (name: string, uri: string) => boolean {
     const defined = new Set<string>();
     const declared = new Set<string>();
     for (const uri of index.getIndexedUris()) {
@@ -37,13 +47,15 @@ export function conditionalReferenceQualifier(
             OChapbookSymbolKind.VariableSet,
         ) ?? [])
             defined.add(ref.contents);
+        if (hasOwnScope(index, uri)) continue;
         for (const ref of index.getReferences(
             uri,
             OChapbookSymbolKind.RootDeclaration,
         ) ?? [])
             declared.add(ref.contents);
     }
-    return (name) => defined.has(name) && !declared.has(name);
+    return (name, uri) =>
+        defined.has(name) && (hasOwnScope(index, uri) || !declared.has(name));
 }
 
 /**
@@ -54,11 +66,14 @@ export function isDisqualifiedConditionalAt(
     documentUri: string,
     position: Position,
     index: ProjectIndex,
-    qualifies?: (name: string) => boolean,
+    qualifies?: (name: string, uri: string) => boolean,
 ): boolean {
     const ref = index.getAllReferencesAt(documentUri, position);
     if (ref?.kind !== OChapbookSymbolKind.ConditionalReference) return false;
-    return !(qualifies ?? conditionalReferenceQualifier(index))(ref.contents);
+    return !(qualifies ?? conditionalReferenceQualifier(index))(
+        ref.contents,
+        documentUri,
+    );
 }
 
 export function getReferencesToSymbolAt(
@@ -92,7 +107,7 @@ export function getReferencesToSymbolAt(
         for (const otherKind of otherKinds) {
             if (
                 otherKind === OChapbookSymbolKind.ConditionalReference &&
-                !qualifies(refs.contents)
+                !qualifies(refs.contents, uri)
             )
                 continue;
             for (const otherRef of index.getReferences(uri, otherKind) ?? []) {

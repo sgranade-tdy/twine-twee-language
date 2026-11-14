@@ -80,6 +80,6 @@ describe("Workspace file tracker", () => {
             { oldUri: "file:///b.tw", newUri: "file:///b.txt" },
         ]);
 
-        expect(index.getIndexedUris().sort()).to.eql(["file:///c.tw"]);
+        expect([...index.getIndexedUris()].sort()).to.eql(["file:///c.tw"]);
     });
 });

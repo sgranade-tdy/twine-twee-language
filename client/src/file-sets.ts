@@ -1,6 +1,6 @@
 import { URI, Utils as UriUtils } from "vscode-uri";
 
-import { isScriptFile, isTweeFile } from "@tt3/shared";
+import { isScriptFile, isTweeFile, ProjectFiles } from "@tt3/shared";
 import { FileType, WorkspaceProvider } from "./workspace-provider";
 
 /**
@@ -15,15 +15,9 @@ export interface FileSetConfig {
 }
 
 /**
- * The project's files, grouped by role.
+ * The project's files, grouped by role, plus what the build needs.
  */
-export interface FileSets {
-    /** `.tw` and `.twee` files matched by `storySourceFiles` minus `ignores`. */
-    tweeFiles: URI[];
-    /** `.js` files matched by `storySourceFiles` minus `ignores`. */
-    storyScriptFiles: URI[];
-    /** `.js` files under `includeSourcePaths` minus `ignores`, excluding any story script file. */
-    includedScripts: URI[];
+export interface FileSets extends ProjectFiles<URI> {
     /** Every file matched by `storySourceFiles` minus `ignores`, whatever its type. The build compiles these. */
     storySourceFiles: URI[];
     /** Each `includeSourcePaths` entry, in config order. The build copies these. */

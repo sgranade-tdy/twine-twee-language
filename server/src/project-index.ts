@@ -83,6 +83,15 @@ export interface References extends Kind, Callable, Sigiled {
 }
 
 /**
+ * The role a local `.js` file plays in the project.
+ *
+ * Story script files are concatenated into the Story JavaScript, so they share
+ * one scope with `script` passages. Included scripts are copied beside the
+ * built story and have their own scope.
+ */
+export type ScriptFileRole = "story-script" | "included-script";
+
+/**
  * Corresponds to the Twee 3 StoryData passage.
  */
 export interface StoryData {
@@ -188,6 +197,13 @@ export interface ProjectIndex {
         uri: string,
         disabledRanges: DiagnosticMap<Range[]>,
     ): void;
+
+    /**
+     * Record the role a `.js` file plays in the project.
+     * @param uri URI of the script file.
+     * @param role Role of the script file.
+     */
+    setScriptFileRole(uri: string, role: ScriptFileRole): void;
 
     /**
      * Get the project's story title, if known.
@@ -360,6 +376,13 @@ export interface ProjectIndex {
     removeDocument(uri: string): void;
 
     /**
+     * Get the role a `.js` file plays in the project.
+     * @param uri URI of the document.
+     * @returns The role, or undefined if the document isn't an indexed script file.
+     */
+    getScriptFileRole(uri: string): ScriptFileRole | undefined;
+
+    /**
      * Rename a document in the project index.
      *
      * If the document doesn't exist in the index, nothing happens.
@@ -392,6 +415,7 @@ export class Index implements ProjectIndex {
     private _parseErrors: Record<string, Diagnostic[]> = {};
     private _disabledDiagnosticRanges: Record<string, DiagnosticMap<Range[]>> =
         {};
+    private _scriptFileRoles: Record<string, ScriptFileRole> = {};
 
     // Cache of passage names, since they take time to generate
     private _cachedPassageNames: Record<string, string[]> = {};
@@ -452,6 +476,12 @@ export class Index implements ProjectIndex {
         disabledRanges: DiagnosticMap<Range[]>,
     ): void {
         this._disabledDiagnosticRanges[uri] = disabledRanges;
+    }
+    setScriptFileRole(uri: string, role: ScriptFileRole): void {
+        this._scriptFileRoles[uri] = role;
+    }
+    getScriptFileRole(uri: string): ScriptFileRole | undefined {
+        return this._scriptFileRoles[uri];
     }
     getStoryTitle(): string | undefined {
         return this._storyTitle;
@@ -737,6 +767,7 @@ export class Index implements ProjectIndex {
         delete this._disabledDiagnosticRanges[uri];
         delete this._cachedPassageNames[uri];
         delete this._cachedPassageTags[uri];
+        delete this._scriptFileRoles[uri];
         if (uri === this._storyTitleUri) {
             this._storyTitle = undefined;
         }
@@ -779,6 +810,9 @@ export class Index implements ProjectIndex {
         }
         if (oldUri in this._cachedPassageTags) {
             this._cachedPassageTags[newUri] = this._cachedPassageTags[oldUri];
+        }
+        if (oldUri in this._scriptFileRoles) {
+            this._scriptFileRoles[newUri] = this._scriptFileRoles[oldUri];
         }
         if (oldUri === this._storyTitleUri) {
             this._storyTitleUri = newUri;
