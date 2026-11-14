@@ -23,10 +23,6 @@ export interface WorkspaceFileTrackerDeps {
     indexScriptFile(document: TextDocument, role: ScriptFileRole): void;
     /** Re-validate every open Twee document. */
     revalidateOpenTweeDocuments(): Promise<void>;
-    timers: {
-        setTimeout(cb: () => void, ms: number): unknown;
-        clearTimeout(handle: unknown): void;
-    };
 }
 
 /**
@@ -42,26 +38,17 @@ export interface WatchedFileChange {
  */
 export class WorkspaceFileTracker {
     private pendingScripts = new Map<string, TextDocument>();
-    private scriptTimer: unknown = undefined;
+    private scriptTimer: ReturnType<typeof setTimeout> | undefined;
 
     constructor(private readonly deps: WorkspaceFileTrackerDeps) {}
-
-    /**
-     * Whether a URI is a resolved script file.
-     */
-    isScriptFile(uri: string): boolean {
-        return this.deps.index.getScriptFileRole(uri) !== undefined;
-    }
 
     /**
      * Note an edit to an open resolved `.js` buffer; it's re-parsed after a debounce.
      */
     handleScriptBufferChanged(document: TextDocument): void {
         this.pendingScripts.set(document.uri, document);
-        if (this.scriptTimer !== undefined) {
-            this.deps.timers.clearTimeout(this.scriptTimer);
-        }
-        this.scriptTimer = this.deps.timers.setTimeout(
+        clearTimeout(this.scriptTimer);
+        this.scriptTimer = setTimeout(
             () => this.flushPendingScripts(),
             scriptReparseDebounceMs,
         );
@@ -71,10 +58,8 @@ export class WorkspaceFileTracker {
      * Synchronously re-parse every pending `.js` buffer, then revalidate open Twee documents.
      */
     flushPendingScripts(): void {
-        if (this.scriptTimer !== undefined) {
-            this.deps.timers.clearTimeout(this.scriptTimer);
-            this.scriptTimer = undefined;
-        }
+        clearTimeout(this.scriptTimer);
+        this.scriptTimer = undefined;
         if (this.pendingScripts.size === 0) return;
         const pending = [...this.pendingScripts.values()];
         this.pendingScripts.clear();

@@ -5,6 +5,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import { updateProjectIndex, updateScriptFileIndex } from "../indexer";
 import { ParseLevel } from "../parser-types";
 import { Index } from "../project-index";
+import { getDefinitionAt } from "../definition";
 import { getReferencesToSymbolAt } from "../references";
 import { generateDiagnostics } from "../validator";
 
@@ -40,6 +41,24 @@ describe("Working from .js files", () => {
             "file:///s.js",
             "file:///story.tw",
         ]);
+    });
+
+    // Pending ticket 29: story variables have no go-to-definition yet
+    it.skip("should go from a story variable in a .js file to its .tw and .js occurrences", () => {
+        const { index, script } = build("State.variables.gold = 2;\n");
+
+        const definition = getDefinitionAt(
+            script,
+            script.positionAt(script.getText().indexOf("gold")),
+            index,
+        );
+
+        expect(
+            [definition]
+                .flat()
+                .map((d) => d?.uri)
+                .sort(),
+        ).to.eql(["file:///s.js", "file:///story.tw"]);
     });
 
     it("should clear variable-never-set in an open .tw once a .js sets the variable", async () => {

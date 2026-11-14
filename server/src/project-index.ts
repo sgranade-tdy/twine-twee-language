@@ -401,6 +401,8 @@ export interface ProjectIndex {
      * @returns The role, or undefined if the document isn't an indexed script file.
      */
     getScriptFileRole(uri: string): ScriptFileRole | undefined;
+    /** Whether a URI is an indexed script file. */
+    isScriptFile(uri: string): boolean;
     /** Get the URIs of all indexed script files. */
     getScriptFileUris(): string[];
 
@@ -504,6 +506,9 @@ export class Index implements ProjectIndex {
     }
     getScriptFileRole(uri: string): ScriptFileRole | undefined {
         return this._scriptFileRoles[uri];
+    }
+    isScriptFile(uri: string): boolean {
+        return this.getScriptFileRole(uri) !== undefined;
     }
     getScriptFileUris(): string[] {
         return Object.keys(this._scriptFileRoles);

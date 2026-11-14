@@ -10,7 +10,9 @@
 - Registration is updated whenever the set changes, by unregistering and registering again.
 - Any `.js` re-parse revalidates the open `.tw` documents.
 
-- The tracker gains an injected clock with `setTimeout`/`clearTimeout` for the debounce, and an injected registration call.
+- The debounce uses the global `setTimeout`/`clearTimeout`; tests fake them with `sinon.useFakeTimers()`, as the open-buffer debounce tests from 23 do. Registration goes through the `ScriptFeatureRegistrar` from 23 (`server/src/script-file-registration.ts`).
+- Closing an open `.js` buffer without saving re-reads the file from disk and re-indexes it, so unsaved edits don't linger in the index.
+- Follow-up while here: move `IndexingQueue` off its injected `Clock` onto the global timers, with sinon fake timers in its tests, and delete `Clock`.
 
 **Blocked by:** 23, 25
 
@@ -22,3 +24,4 @@
 - [ ] A file that moves from included script to story script file is re-parsed with the new kind
 - [ ] A burst of create events causes one re-resolve
 - [ ] `.js` files outside the resolved sets are ignored
+- [ ] Closing an edited, unsaved `.js` buffer restores the on-disk contents in the index, and `variable-never-set` in open `.tw` files updates

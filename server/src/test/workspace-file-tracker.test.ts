@@ -1,17 +1,21 @@
 import { expect } from "chai";
+import * as sinon from "sinon";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
 
+import { updateProjectIndex, updateScriptFileIndex } from "../indexer";
+import { ParseLevel } from "../parser-types";
 import { Index } from "../project-index";
+import { generateRenames } from "../renames";
 import {
     WorkspaceFileTracker,
     WorkspaceFileTrackerDeps,
+    scriptReparseDebounceMs,
 } from "../workspace-file-tracker";
 
 function build(overrides: Partial<WorkspaceFileTrackerDeps> = {}) {
     const calls: string[] = [];
     const queued: string[] = [];
-    const timers: { cb: () => void; ms: number; cancelled: boolean }[] = [];
     const index = new Index();
     const deps: WorkspaceFileTrackerDeps = {
         index,
@@ -21,26 +25,13 @@ function build(overrides: Partial<WorkspaceFileTrackerDeps> = {}) {
         onMacroChanges: () => void calls.push("macroChanges"),
         indexScriptFile: (doc) => void calls.push(`script:${doc.uri}`),
         revalidateOpenTweeDocuments: async () => void calls.push("revalidate"),
-        timers: {
-            setTimeout: (cb, ms) => {
-                const handle = { cb, ms, cancelled: false };
-                timers.push(handle);
-                return handle;
-            },
-            clearTimeout: (h) => {
-                (h as { cancelled: boolean }).cancelled = true;
-            },
-        },
         ...overrides,
     };
-    const fire = () =>
-        timers.filter((t) => !t.cancelled).forEach((t) => t.cb());
     return {
         tracker: new WorkspaceFileTracker(deps),
         calls,
         queued,
         index,
-        fire,
     };
 }
 
@@ -108,27 +99,39 @@ describe("Workspace file tracker", () => {
 
     describe("open .js buffers", () => {
         const doc = TextDocument.create("file:///a.js", "javascript", 1, "x");
+        let clock: sinon.SinonFakeTimers;
+
+        beforeEach(() => {
+            clock = sinon.useFakeTimers();
+        });
+
+        afterEach(() => {
+            clock.restore();
+        });
 
         it("should coalesce a burst of edits into one re-parse after the debounce", () => {
-            const { tracker, calls, index, fire } = build();
+            const { tracker, calls, index } = build();
             index.setScriptFileRole(doc.uri, "story-script");
 
             tracker.handleScriptBufferChanged(doc);
+            clock.tick(scriptReparseDebounceMs - 1);
             tracker.handleScriptBufferChanged(doc);
+            clock.tick(scriptReparseDebounceMs - 1);
             tracker.handleScriptBufferChanged(doc);
+            clock.tick(scriptReparseDebounceMs - 1);
             expect(calls).to.eql([]);
-            fire();
+            clock.tick(1);
 
             expect(calls).to.eql(["script:file:///a.js", "revalidate"]);
         });
 
         it("should flush pending parses synchronously", () => {
-            const { tracker, calls, index, fire } = build();
+            const { tracker, calls, index } = build();
             index.setScriptFileRole(doc.uri, "story-script");
 
             tracker.handleScriptBufferChanged(doc);
             tracker.flushPendingScripts();
-            fire();
+            clock.runAll();
 
             expect(calls).to.eql(["script:file:///a.js", "revalidate"]);
         });
@@ -139,6 +142,57 @@ describe("Workspace file tracker", () => {
             tracker.flushPendingScripts();
 
             expect(calls).to.eql([]);
+        });
+
+        it("should rename using a buffer edited before the debounce fires", () => {
+            const index = new Index();
+            const { tracker } = build({
+                index,
+                indexScriptFile: (d, role) =>
+                    updateScriptFileIndex(d, role, ParseLevel.Full, index),
+            });
+            const tw = TextDocument.create(
+                "file:///story.tw",
+                "twee3",
+                1,
+                ':: StoryData\n{"ifid": "x", "format": "SugarCube", "format-version": "2.36.1"}\n\n' +
+                    ":: Start\n<<print $gold>>\n",
+            );
+            updateProjectIndex(tw, ParseLevel.Full, index);
+            updateScriptFileIndex(
+                TextDocument.create(
+                    doc.uri,
+                    "javascript",
+                    1,
+                    "State.variables.gold = 1;\n",
+                ),
+                "story-script",
+                ParseLevel.Full,
+                index,
+            );
+
+            tracker.handleScriptBufferChanged(
+                TextDocument.create(
+                    doc.uri,
+                    "javascript",
+                    2,
+                    "State.variables.gold = 1;\nState.variables.gold += 2;\n",
+                ),
+            );
+            // What the server's request handlers do before answering
+            tracker.flushPendingScripts();
+            const edit = generateRenames(
+                tw.uri,
+                tw.positionAt(tw.getText().indexOf("gold")),
+                "silver",
+                index,
+            );
+
+            expect(
+                (edit as { changes: Record<string, unknown[]> }).changes[
+                    doc.uri
+                ],
+            ).to.have.length(2);
         });
     });
 });

@@ -5,14 +5,7 @@ import {
     createConnection,
     DefinitionParams,
     Definition,
-    DefinitionRequest,
-    Disposable,
     DidChangeConfigurationNotification,
-    DidChangeTextDocumentNotification,
-    DidCloseTextDocumentNotification,
-    DidOpenTextDocumentNotification,
-    ReferencesRequest,
-    RenameRequest,
     DidCreateFilesNotification,
     DidDeleteFilesNotification,
     DidRenameFilesNotification,
@@ -67,7 +60,7 @@ import {
 import { generateDiagnostics } from "./validator";
 import { IndexingQueue } from "./indexing-queue";
 import { WorkspaceFileTracker } from "./workspace-file-tracker";
-import { buildScriptFileSelector } from "./script-file-selector";
+import { ScriptFeatureRegistrar } from "./script-file-registration";
 import { getSugarCubeMacroInfo } from "./passage-text-parsers/sugarcube";
 import {
     setCustomMacrosAndEnums,
@@ -87,9 +80,7 @@ let hasCompletionListItemDefaults = false;
 let hasDiagnosticRelatedInformationCapability = false;
 let hasPrepareProviderCapability = false;
 let hasDocumentChangesCapability = false;
-let canRegisterScriptFeatures = false;
-let scriptRegistrations: Disposable[] = [];
-let scriptRegistrationKey = "";
+let scriptRegistrar: ScriptFeatureRegistrar | undefined;
 
 const indexingQueue = new IndexingQueue({
     clock: {
@@ -120,7 +111,7 @@ const indexingQueue = new IndexingQueue({
         connection.sendNotification(CustomMessages.IndexingStarted),
     indexingComplete: () => {
         void connection.sendNotification(CustomMessages.IndexingComplete);
-        void registerScriptFileFeatures();
+        void scriptRegistrar?.update(projectIndex.getScriptFileUris());
     },
     logError: (message) => connection.console.error(message),
 });
@@ -134,11 +125,6 @@ const fileTracker = new WorkspaceFileTracker({
     indexScriptFile: (doc, role) =>
         updateScriptFileIndex(doc, role, ParseLevel.Full, projectIndex),
     revalidateOpenTweeDocuments: () => revalidateOpenTweeDocuments(),
-    timers: {
-        setTimeout: (cb, ms) => setTimeout(cb, ms),
-        clearTimeout: (handle) =>
-            clearTimeout(handle as ReturnType<typeof setTimeout>),
-    },
 });
 
 connection.onInitialize((params: InitializeParams) => {
@@ -152,7 +138,7 @@ connection.onInitialize((params: InitializeParams) => {
         capabilities.textDocument.publishDiagnostics &&
         capabilities.textDocument.publishDiagnostics.relatedInformation
     );
-    canRegisterScriptFeatures = !!(
+    const canRegisterScriptFeatures = !!(
         capabilities.textDocument?.references?.dynamicRegistration &&
         capabilities.textDocument?.definition?.dynamicRegistration &&
         capabilities.textDocument?.rename?.dynamicRegistration &&
@@ -169,6 +155,13 @@ connection.onInitialize((params: InitializeParams) => {
         !!capabilities.textDocument?.rename?.prepareSupport;
     hasDocumentChangesCapability =
         !!capabilities.workspace?.workspaceEdit?.documentChanges;
+    if (canRegisterScriptFeatures) {
+        scriptRegistrar = new ScriptFeatureRegistrar({
+            client: connection.client,
+            prepareProvider: hasPrepareProviderCapability,
+            logError: (message) => connection.console.error(message),
+        });
+    }
 
     const result: InitializeResult = {
         capabilities: {
@@ -311,17 +304,18 @@ connection.onCompletion(
     },
 );
 
-connection.onDefinition((params: DefinitionParams): Definition | undefined => {
-    fileTracker.flushPendingScripts();
-    const document = documents.get(params.textDocument.uri);
-    if (document === undefined) {
-        return undefined;
-    }
-    return getDefinitionAt(document, params.position, projectIndex);
-});
+connection.onDefinition(
+    withFreshScripts((params: DefinitionParams): Definition | undefined => {
+        const document = documents.get(params.textDocument.uri);
+        if (document === undefined) {
+            return undefined;
+        }
+        return getDefinitionAt(document, params.position, projectIndex);
+    }),
+);
 
 documents.onDidChangeContent(async (change) => {
-    if (fileTracker.isScriptFile(change.document.uri)) {
+    if (projectIndex.isScriptFile(change.document.uri)) {
         fileTracker.handleScriptBufferChanged(change.document);
         return;
     }
@@ -333,7 +327,12 @@ documents.onDidChangeContent(async (change) => {
     sendDecorationRanges(change.document.uri);
 });
 
-// documents.onDidClose;
+documents.onDidClose((change) => {
+    // Index the last buffer contents (e.g. a save-and-close inside the debounce)
+    if (projectIndex.isScriptFile(change.document.uri)) {
+        fileTracker.flushPendingScripts();
+    }
+});
 
 connection.onDidChangeWatchedFiles((_change) => {
     fileTracker.handleWatchedFileChanges(
@@ -345,11 +344,8 @@ connection.onDidChangeWatchedFiles((_change) => {
 });
 
 documents.onDidOpen(async (change) => {
-    if (fileTracker.isScriptFile(change.document.uri)) {
-        fileTracker.handleScriptBufferChanged(change.document);
-        fileTracker.flushPendingScripts();
-        return;
-    }
+    // onDidChangeContent, which also fires on open, re-parses script files
+    if (projectIndex.isScriptFile(change.document.uri)) return;
     // Parse w/re-indexing
     await parseTextDocument(change.document, ParseLevel.Full, true);
     // Validate
@@ -400,41 +396,44 @@ connection.onNotification(DidRenameFilesNotification.type, async (params) => {
     await fileTracker.handleFilesRenamed(params.files);
 });
 
-connection.onPrepareRename((params: PrepareRenameParams): Range | undefined => {
-    fileTracker.flushPendingScripts();
-    return prepareRename(
-        params.textDocument.uri,
-        params.position,
-        projectIndex,
-    );
-});
-
-connection.onRenameRequest(
-    (params: RenameParams): WorkspaceEdit | ResponseError<void> | null => {
-        fileTracker.flushPendingScripts();
-        return generateRenames(
+connection.onPrepareRename(
+    withFreshScripts((params: PrepareRenameParams): Range | undefined => {
+        return prepareRename(
             params.textDocument.uri,
             params.position,
-            params.newName,
             projectIndex,
-            undefined,
-            {
-                documentChanges: hasDocumentChangesCapability,
-                versionOf: (uri) => documents.get(uri)?.version ?? null,
-            },
         );
-    },
+    }),
 );
 
-connection.onReferences((params: ReferenceParams): Location[] | undefined => {
-    fileTracker.flushPendingScripts();
-    return getReferencesToSymbolAt(
-        params.textDocument.uri,
-        params.position,
-        projectIndex,
-        params.context.includeDeclaration,
-    );
-});
+connection.onRenameRequest(
+    withFreshScripts(
+        (params: RenameParams): WorkspaceEdit | ResponseError<void> | null => {
+            return generateRenames(
+                params.textDocument.uri,
+                params.position,
+                params.newName,
+                projectIndex,
+                undefined,
+                {
+                    documentChanges: hasDocumentChangesCapability,
+                    versionOf: (uri) => documents.get(uri)?.version ?? null,
+                },
+            );
+        },
+    ),
+);
+
+connection.onReferences(
+    withFreshScripts((params: ReferenceParams): Location[] | undefined => {
+        return getReferencesToSymbolAt(
+            params.textDocument.uri,
+            params.position,
+            projectIndex,
+            params.context.includeDeclaration,
+        );
+    }),
+);
 
 connection.onRequest("textDocument/semanticTokens/full", (params) => {
     return generateSemanticTokens(params.textDocument.uri, projectIndex);
@@ -595,75 +594,39 @@ async function parseT3LTMacroFile(uri: string) {
  * options) that could affect parsing.
  */
 async function processAllOpenDocuments() {
-    const tweeDocs = documents
-        .all()
-        .filter((doc) => !fileTracker.isScriptFile(doc.uri));
-    // Loop through twice since validation can depend on the result of parsing all docs
-    for (const doc of tweeDocs) {
+    // Parse everything before validating, since validation can depend on the result of parsing all docs
+    for (const doc of openTweeDocuments()) {
         await parseTextDocument(doc, ParseLevel.Full, true);
     }
-    for (const doc of tweeDocs) {
-        await validateTextDocument(doc);
-    }
+    await revalidateOpenTweeDocuments();
+}
 
-    // Request that the client re-do diagnostics since we've re-processed
-    connection.languages.diagnostics.refresh();
+/**
+ * Get every open Twee document (not script files).
+ */
+function openTweeDocuments(): TextDocument[] {
+    return documents.all().filter((doc) => !projectIndex.isScriptFile(doc.uri));
 }
 
 /**
  * Re-validate every open Twee document (not script files).
  */
 async function revalidateOpenTweeDocuments() {
-    for (const doc of documents.all()) {
-        if (!fileTracker.isScriptFile(doc.uri)) {
-            await validateTextDocument(doc);
-        }
+    for (const doc of openTweeDocuments()) {
+        await validateTextDocument(doc);
     }
+    // Ask the client to re-pull diagnostics
+    connection.languages.diagnostics.refresh();
 }
 
 /**
- * Register text sync, references, definition and rename for exactly the resolved `.js` files.
- *
- * Re-registers whenever the set of files changes.
+ * Wrap a request handler so it first re-parses any pending `.js` buffer edits.
  */
-async function registerScriptFileFeatures() {
-    if (!canRegisterScriptFeatures) return;
-    const selector = buildScriptFileSelector(projectIndex.getScriptFileUris());
-    const key = JSON.stringify(selector);
-    if (key === scriptRegistrationKey) return;
-    const old = scriptRegistrations;
-    scriptRegistrations = [];
-    scriptRegistrationKey = key;
-    for (const reg of old) {
-        await reg.dispose();
-    }
-    if (selector.length === 0) return;
-    const options = { documentSelector: selector };
-    try {
-        scriptRegistrations = await Promise.all([
-            connection.client.register(
-                DidOpenTextDocumentNotification.type,
-                options,
-            ),
-            connection.client.register(DidChangeTextDocumentNotification.type, {
-                ...options,
-                syncKind: TextDocumentSyncKind.Full,
-            }),
-            connection.client.register(
-                DidCloseTextDocumentNotification.type,
-                options,
-            ),
-            connection.client.register(ReferencesRequest.type, options),
-            connection.client.register(DefinitionRequest.type, options),
-            connection.client.register(RenameRequest.type, {
-                ...options,
-                prepareProvider: hasPrepareProviderCapability,
-            }),
-        ]);
-    } catch (err) {
-        scriptRegistrationKey = "";
-        connection.console.error(`Couldn't register .js features: ${err}`);
-    }
+function withFreshScripts<P, R>(handler: (params: P) => R): (params: P) => R {
+    return (params) => {
+        fileTracker.flushPendingScripts();
+        return handler(params);
+    };
 }
 
 /**
