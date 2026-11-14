@@ -14,6 +14,7 @@ import { ParseLevel, ParserCallbacks } from "./parser-types";
 import { getStoryFormatParser } from "./passage-text-parsers";
 import {
     calleeFlag,
+    sigilFlag,
     Passage,
     ProjectIndex,
     ProjSymbol,
@@ -140,12 +141,13 @@ export function updateProjectIndex(
     // so diagnostics can exempt call sites w/o exempting plain reads
     const referencesMap: Record<string, References> = {};
     for (const symbol of indexingState.references) {
-        const key = `${symbol.kind},${symbol.contents},${!!symbol.isCallee}`;
+        const key = `${symbol.kind},${symbol.contents},${!!symbol.isCallee},${!!symbol.sigilOutsideRange}`;
         const ref = referencesMap[key] || {
             contents: symbol.contents,
             locations: [],
             kind: symbol.kind,
             ...calleeFlag(symbol),
+            ...sigilFlag(symbol),
         };
         ref.locations.push(symbol.location);
         referencesMap[key] = ref;

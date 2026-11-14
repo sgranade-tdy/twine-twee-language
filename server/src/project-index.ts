@@ -41,9 +41,29 @@ export function calleeFlag(source: Callable): Callable {
 }
 
 /**
+ * Tracks whether a story variable's sigil (`$` or `_`) sits outside its range.
+ */
+export interface Sigiled {
+    /**
+     * True if the occurrence's range doesn't include its variable's sigil
+     * (e.g. the range covers `var` in `State.variables.var`). Absent means
+     * the range includes the sigil or the variable has none.
+     */
+    sigilOutsideRange?: boolean;
+}
+
+/**
+ * Spread-ready `sigilOutsideRange` flag that's absent unless true, keeping
+ * indexed shapes sparse.
+ */
+export function sigilFlag(source: Sigiled): Sigiled {
+    return source.sigilOutsideRange ? { sigilOutsideRange: true } : {};
+}
+
+/**
  * A label with a number that identifies the kind of label it is.
  */
-export interface ProjSymbol extends Label, Kind, Callable {}
+export interface ProjSymbol extends Label, Kind, Callable, Sigiled {}
 
 /**
  * Kind of a Twine symbol.
@@ -57,7 +77,7 @@ export enum TwineSymbolKind {
 /**
  * References, which have contents, locations, and an identifier for its kind.
  */
-export interface References extends Kind, Callable {
+export interface References extends Kind, Callable, Sigiled {
     contents: string;
     locations: Location[];
 }
@@ -541,6 +561,7 @@ export class Index implements ProjectIndex {
                         contents: ref.contents,
                         kind: ref.kind,
                         location: match,
+                        ...sigilFlag(ref),
                     };
                 }
             }
