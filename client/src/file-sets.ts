@@ -24,9 +24,19 @@ export interface FileSets {
     storyScriptFiles: URI[];
     /** `.js` files under `includeSourcePaths` minus `ignores`, excluding any story script file. */
     includedScripts: URI[];
+    /** Every file matched by `storySourceFiles` minus `ignores`, whatever its type. The build compiles these. */
+    storySourceFiles: URI[];
+    /** Each `includeSourcePaths` entry, in config order. The build copies these. */
+    includeEntries: (IncludeEntry | FailedIncludeEntry)[];
 }
 
-function removeEndingSlash(str: string): string {
+/**
+ * Remove the ending slash from a string, if it exists.
+ *
+ * @param str String to remove slash from.
+ * @returns String without any ending slash.
+ */
+export function removeEndingSlash(str: string): string {
     return str.endsWith("/") ? str.slice(0, -1) : str;
 }
 
@@ -135,19 +145,40 @@ export async function getFilesFromSources(
 }
 
 /**
+ * One `includeSourcePaths` entry, resolved.
+ */
+export interface IncludeEntry {
+    /** The entry as configured, without any trailing slash. */
+    entry: string;
+    isDirectory: boolean;
+    sourceUri: URI;
+    /** Every file the entry yields, whatever its type. */
+    files: URI[];
+}
+
+/**
+ * An `includeSourcePaths` entry that couldn't be resolved.
+ */
+export interface FailedIncludeEntry {
+    entry: string;
+    error: unknown;
+}
+
+/**
  * Resolve one `includeSourcePaths` entry the way the build does: a directory becomes
  * `<dir>/**\/*`, a file stays as written, and `ignores` is subtracted.
- * @param entry Entry from `includeSourcePaths`, without a trailing slash.
+ * @param entry Entry from `includeSourcePaths`.
  * @param ignores Glob patterns to ignore.
  * @param workspaceProvider Workspace provider.
- * @returns Whether the entry is a directory, its URI, and the files it yields.
+ * @returns The resolved entry.
  * @throws If the entry can't be stat'd.
  */
 export async function resolveIncludeEntry(
     entry: string,
     ignores: string[] | undefined,
     workspaceProvider: WorkspaceProvider,
-): Promise<{ isDirectory: boolean; sourceUri: URI; files: URI[] }> {
+): Promise<IncludeEntry> {
+    entry = removeEndingSlash(entry);
     const sourceUri = UriUtils.joinPath(
         workspaceProvider.rootWorkspaceUri() ?? URI.file("."),
         entry,
@@ -160,7 +191,59 @@ export async function resolveIncludeEntry(
         ignores,
         workspaceProvider,
     );
-    return { isDirectory, sourceUri, files };
+    return { entry, isDirectory, sourceUri, files };
+}
+
+/**
+ * A file the build copies, and where it copies it to.
+ */
+export interface IncludeCopy {
+    source: URI;
+    destination: URI;
+}
+
+/**
+ * Work out where the build copies an include entry's files. A file entry's
+ * files go straight into the build directory; a directory entry's files keep
+ * their sub-directories beneath the entry.
+ * @param include Resolved include entry.
+ * @param buildUri URI to the build directory.
+ */
+export function includeCopies(
+    include: IncludeEntry,
+    buildUri: URI,
+): IncludeCopy[] {
+    if (!include.isDirectory) {
+        return include.files.map((source) => ({
+            source,
+            destination: UriUtils.joinPath(buildUri, UriUtils.basename(source)),
+        }));
+    }
+
+    const includeSourceWorkspacePath = include.sourceUri.toString(true);
+    return include.files.map((source) => {
+        let fileRelativePath: string;
+        const fileWorkspacePath = source.toString(true);
+        // First: is the raw include src path in the found file's path?
+        const ndx = fileWorkspacePath.indexOf(includeSourceWorkspacePath);
+        if (ndx !== -1) {
+            fileRelativePath = fileWorkspacePath.slice(
+                ndx + includeSourceWorkspacePath.length,
+            );
+        } else {
+            // Fallback: Remove everything before the name of the
+            // raw include directory, which can give odd results if
+            // that directory's name shows up multiple times in
+            // the URI (ex: `file://root/include/fonts/include/font.otf`)
+            fileRelativePath = fileWorkspacePath
+                .split(include.entry, 1)
+                .slice(-1)[0];
+        }
+        return {
+            source,
+            destination: UriUtils.joinPath(buildUri, fileRelativePath),
+        };
+    });
 }
 
 /**
@@ -172,30 +255,33 @@ export async function resolveFileSets(
     config: FileSetConfig,
     workspaceProvider: WorkspaceProvider,
 ): Promise<FileSets> {
-    const sourceFiles = await getFilesFromSources(
+    const storySourceFiles = await getFilesFromSources(
         config.build.storySourceFiles,
         config.build.ignores,
         workspaceProvider,
     );
-    const tweeFiles = sourceFiles.filter((f) => isTweeFile(f.path));
-    const storyScriptFiles = sourceFiles.filter((f) => isScriptFile(f.path));
+    const tweeFiles = storySourceFiles.filter((f) => isTweeFile(f.path));
+    const storyScriptFiles = storySourceFiles.filter((f) =>
+        isScriptFile(f.path),
+    );
     const storyScriptKeys = new Set(storyScriptFiles.map((f) => f.toString()));
 
+    const includeEntries: (IncludeEntry | FailedIncludeEntry)[] = [];
     const included = new Map<string, URI>();
-    for (const rawEntry of config.build.includeSourcePaths ?? []) {
-        let files: URI[];
+    for (const entry of config.build.includeSourcePaths ?? []) {
+        let include: IncludeEntry;
         try {
-            files = (
-                await resolveIncludeEntry(
-                    removeEndingSlash(rawEntry),
-                    config.build.ignores,
-                    workspaceProvider,
-                )
-            ).files;
-        } catch {
-            continue; // Missing entries just contribute nothing
+            include = await resolveIncludeEntry(
+                entry,
+                config.build.ignores,
+                workspaceProvider,
+            );
+        } catch (error) {
+            includeEntries.push({ entry: removeEndingSlash(entry), error });
+            continue;
         }
-        for (const f of files) {
+        includeEntries.push(include);
+        for (const f of include.files) {
             const key = f.toString();
             if (isScriptFile(f.path) && !storyScriptKeys.has(key)) {
                 included.set(key, f);
@@ -207,5 +293,7 @@ export async function resolveFileSets(
         tweeFiles,
         storyScriptFiles,
         includedScripts: [...included.values()],
+        storySourceFiles,
+        includeEntries,
     };
 }
