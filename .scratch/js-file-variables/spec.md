@@ -173,7 +173,7 @@ The server claims only text sync, references, definition and rename, and only fo
   - registration updates;
   - the StoryData-delete reindex.
 
-  Its collaborators are injected: clock and timers, stat, file reader, the registration call and the indexing queue. Relevance is decided by membership in the resolved sets. The unanchored `.tw` URI test is retired from event handling.
+  Its collaborators are injected: clock and timers, stat, the registration call and the **indexing queue** (a separate server module that runs indexing work one task at a time). Each is added when a feature first needs it. Relevance is decided by membership in the resolved sets. The unanchored `.tw` URI test is retired from event handling.
 - **Watcher events:**
   - **Create** re-resolves the sets.
   - **Change to a file that isn't open** re-reads and re-indexes it at full level, and validates `.tw` files.
@@ -220,7 +220,7 @@ The server claims only text sync, references, definition and rename, and only fo
 
   Prior art: the existing SugarCube and Chapbook parser tests and the JS parser tests. Synthetic inputs stay inline as strings, following the current convention.
 - **Seam 3: file-set resolution (new).** Use a fake workspace provider to test directory versus file entries, `ignores`, `.js` filtering, overlap precedence and parity with what the build copies. Prior art: the client build tests.
-- **Seam 4: workspace file tracker (new).** With fake timers, stat, reader, registration and index queue, test:
+- **Seam 4: workspace file tracker (new).** With fake timers, stat, registration and indexing queue, test:
   - create, change and delete for `.tw` and `.js`, open versus closed;
   - debounce coalescing;
   - selector rebuild and escaping;

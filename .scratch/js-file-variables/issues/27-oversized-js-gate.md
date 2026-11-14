@@ -2,6 +2,8 @@
 
 **What to build:** A `.js` file over 5 MB (by on-disk size) isn't parsed, indexed or registered, so the server stays responsive. The author is told once why rename and find-references can't see inside it (spec: Size gate; user stories 54, 55). The limit is fixed, with no setting.
 
+- The workspace file tracker gains an injected stat to read on-disk sizes.
+
 **Blocked by:** 23
 
 **Status:** ready-for-agent

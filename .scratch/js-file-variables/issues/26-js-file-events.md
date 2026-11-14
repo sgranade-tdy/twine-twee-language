@@ -10,6 +10,8 @@
 - Registration is updated whenever the set changes, by unregistering and registering again.
 - Any `.js` re-parse revalidates the open `.tw` documents.
 
+- The tracker gains an injected clock with `setTimeout`/`clearTimeout` for the debounce, and an injected registration call.
+
 **Blocked by:** 23, 25
 
 **Status:** ready-for-agent
