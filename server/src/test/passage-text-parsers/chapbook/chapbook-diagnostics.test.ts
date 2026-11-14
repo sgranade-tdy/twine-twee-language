@@ -52,6 +52,41 @@ describe("Chapbook Diagnostics", () => {
             ]);
         });
 
+        it("should neither raise nor suppress variable-never-set for conditional references", () => {
+            const doc = TextDocument.create("fake-uri", "", 0, "Text");
+            const index = new Index();
+            index.setReferences("fake-uri", [
+                {
+                    contents: "var1",
+                    locations: [
+                        Location.create("fake-uri", Range.create(1, 2, 3, 4)),
+                    ],
+                    kind: OChapbookSymbolKind.ConditionalVariable,
+                },
+                {
+                    contents: "var2",
+                    locations: [
+                        Location.create("fake-uri", Range.create(5, 2, 5, 4)),
+                    ],
+                    kind: OChapbookSymbolKind.ConditionalVariable,
+                },
+                {
+                    contents: "var2",
+                    locations: [
+                        Location.create("fake-uri", Range.create(6, 2, 6, 4)),
+                    ],
+                    kind: OChapbookSymbolKind.Variable,
+                },
+            ]);
+            const parser = uut.getChapbookParser(undefined);
+
+            const result = parser?.generateDiagnostics(doc, index);
+
+            expect(result?.map((d) => d.range)).to.eql([
+                Range.create(6, 2, 6, 4),
+            ]);
+        });
+
         it("should support disabling non-set variable errors", () => {
             const doc = TextDocument.create(
                 "fake-uri",

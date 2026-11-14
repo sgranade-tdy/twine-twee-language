@@ -28,9 +28,23 @@ const typeofToSemantic: Record<string, TokenType> = {
 };
 
 /**
+ * What a script-code variable occurrence is, when it isn't an ordinary variable.
+ *
+ * - `conditional`: a bare name that counts only when the project defines it
+ *   elsewhere and no root-level declaration binds it (ADR-0005).
+ * - `root-declaration`: a root-level declaration, recorded so conditional
+ *   references can be filtered against it.
+ */
+export type ScriptOccurrenceRole = "conditional" | "root-declaration";
+
+/**
  * Label for a parsed javascript variable.
  */
 export interface JSVariableLabel extends Label, Sigiled {
+    /**
+     * Set for occurrences that aren't ordinary story variables.
+     */
+    role?: ScriptOccurrenceRole;
     /**
      * Whether the variable is being assigned to.
      */
@@ -100,6 +114,7 @@ export interface ScriptVariableOccurrence {
     at: number;
     assigned: boolean;
     sigilOutsideRange?: boolean;
+    role?: ScriptOccurrenceRole;
 }
 
 /**
@@ -121,6 +136,7 @@ export type ScriptSymbolExtractor = (context: {
     ast: acorn.Node;
     text: string;
     scopeManager: eslintScope.ScopeManager;
+    isGlobalName: (name: string) => boolean;
 }) => {
     variables: ScriptVariableOccurrence[];
     properties: ScriptPropertyOccurrence[];
@@ -1487,6 +1503,7 @@ export function tokenizeJavaScript(
                   ast,
                   text,
                   scopeManager: analyzeScopes(ast),
+                  isGlobalName,
               })
             : extractSymbols(ast, isGlobalName, isAssignmentContext);
         for (const variable of variables) {
@@ -1499,6 +1516,7 @@ export function tokenizeJavaScript(
                 ),
                 assigned: variable.assigned,
                 ...sigilFlag(variable),
+                ...(variable.role ? { role: variable.role } : {}),
             });
         }
         for (const property of properties) {

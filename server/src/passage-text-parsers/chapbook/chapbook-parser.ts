@@ -36,6 +36,7 @@ import {
 } from "../../utilities";
 import { browserGlobals } from "../host-globals";
 import { ParsingState, capturePreSemanticTokenFor } from "../types";
+import { createChapbookScriptExtractor } from "./chapbook-script-symbols";
 import {
     findShadowedVariable,
     shadowedVariableMessage,
@@ -113,13 +114,20 @@ function createVariableAndPropertyReferences(
     isSet?: boolean,
 ): void {
     for (const v of jsTokens.variables) {
+        let kind: ChapbookSymbolKind;
+        if (v.role === "conditional") {
+            kind = OChapbookSymbolKind.ConditionalVariable;
+        } else if (v.role === "root-declaration") {
+            kind = OChapbookSymbolKind.RootDeclaration;
+        } else if (isSet || v.assigned) {
+            kind = OChapbookSymbolKind.VariableSet;
+        } else {
+            kind = OChapbookSymbolKind.Variable;
+        }
         state.callbacks.onSymbolReference({
             contents: v.contents,
             location: v.location,
-            kind:
-                isSet || v.assigned
-                    ? OChapbookSymbolKind.VariableSet
-                    : OChapbookSymbolKind.Variable,
+            kind,
         });
     }
     for (const p of jsTokens.properties) {
@@ -930,6 +938,7 @@ function findAndParseEngineStateSets(
     contentsIndex: number,
     state: ParsingState,
     chapbookState: ChapbookParsingState,
+    captureReferences = true,
 ): void {
     for (const m of contents.matchAll(/engine.state.set\(/g)) {
         let ndx = m.index + m[0].length; // Just inside the function call's parens
@@ -954,6 +963,7 @@ function findAndParseEngineStateSets(
                         state,
                     );
                 }
+                if (!captureReferences) continue;
                 // Parse the value as a JavaScript expression, but make every var/property a definition
                 const tokens = tokenizeJavaScript(
                     false,
@@ -1571,9 +1581,11 @@ function parseScript(
     textIndex: number,
     state: ParsingState,
     chapbookState: ChapbookParsingState,
+    isScriptPassage = false,
 ): void {
     findAndParseEngineExtensions(text, textIndex, state);
-    findAndParseEngineStateSets(text, textIndex, state, chapbookState);
+    // The script tokenizing below captures the variables, so only check shadowing
+    findAndParseEngineStateSets(text, textIndex, state, chapbookState, false);
     // We don't have a language server for JS, so we create an embedded document
     // for it that gets passed to our completions and hover functions, but we also
     // separately tokenize it.
@@ -1584,7 +1596,12 @@ function parseScript(
             textIndex,
             state.textDocument,
             chapbookState,
-            { isAssignmentContext: true },
+            {
+                isAssignmentContext: true,
+                extractScriptSymbols: createChapbookScriptExtractor({
+                    recordRootDeclarations: isScriptPassage,
+                }),
+            },
         ),
         state,
     );
@@ -2381,7 +2398,7 @@ export function parsePassageText(
 
     if (state.currentPassage?.isScript) {
         // If it's a script passage, parse it as a script instead of Chapbook
-        parseScript(passageText, textIndex, state, chapbookState);
+        parseScript(passageText, textIndex, state, chapbookState, true);
     } else {
         const passageParts = divideChapbookPassage(passageText);
         if (passageParts.vars !== undefined) {

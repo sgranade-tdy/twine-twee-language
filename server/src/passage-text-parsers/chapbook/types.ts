@@ -193,6 +193,13 @@ export const OChapbookSymbolKind = {
     VariableSet: TwineSymbolKind._end + 6,
     Property: TwineSymbolKind._end + 7,
     PropertySet: TwineSymbolKind._end + 8,
+    // A bare name in script code. It counts as a reference to a story variable
+    // only if the project defines that variable elsewhere and no root-level
+    // declaration binds it, so it's filtered at query time (ADR-0005)
+    ConditionalVariable: TwineSymbolKind._end + 9,
+    // A root-level declaration in a `script` passage, which disqualifies
+    // conditional references to the same name
+    RootDeclaration: TwineSymbolKind._end + 10,
 };
 export type ChapbookSymbolKind =
     (typeof OChapbookSymbolKind)[keyof typeof OChapbookSymbolKind];
