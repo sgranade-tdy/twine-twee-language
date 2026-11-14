@@ -8,7 +8,7 @@ const linkedKindGroups: number[][] = [
     [
         OChapbookSymbolKind.Variable,
         OChapbookSymbolKind.VariableSet,
-        OChapbookSymbolKind.ConditionalVariable,
+        OChapbookSymbolKind.ConditionalReference,
     ],
     [OChapbookSymbolKind.Property, OChapbookSymbolKind.PropertySet],
 ];
@@ -18,7 +18,8 @@ const linkedKindGroups: number[][] = [
  * script code) to a variable currently counts as a reference to it.
  *
  * It counts only if the project defines the variable somewhere and no
- * root-level declaration in a `script` passage binds that name (ADR-0005).
+ * root-level declaration in a story script file or `script` passage binds that
+ * name (ADR-0005).
  * Evaluating this at query time means no file has to be re-parsed when another
  * file changes.
  *
@@ -56,7 +57,7 @@ export function isDisqualifiedConditionalAt(
     qualifies?: (name: string) => boolean,
 ): boolean {
     const ref = index.getAllReferencesAt(documentUri, position);
-    if (ref?.kind !== OChapbookSymbolKind.ConditionalVariable) return false;
+    if (ref?.kind !== OChapbookSymbolKind.ConditionalReference) return false;
     return !(qualifies ?? conditionalReferenceQualifier(index))(ref.contents);
 }
 
@@ -90,7 +91,7 @@ export function getReferencesToSymbolAt(
     for (const uri of index.getIndexedUris()) {
         for (const otherKind of otherKinds) {
             if (
-                otherKind === OChapbookSymbolKind.ConditionalVariable &&
+                otherKind === OChapbookSymbolKind.ConditionalReference &&
                 !qualifies(refs.contents)
             )
                 continue;

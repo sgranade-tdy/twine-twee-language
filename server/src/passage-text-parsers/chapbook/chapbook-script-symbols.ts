@@ -6,12 +6,11 @@ import {
     ScriptSymbolExtractor,
     ScriptVariableOccurrence,
 } from "../../js-parser";
-import { createScriptAnalysis } from "../../script-analysis";
-
-const identifierRegexp = /^[A-Za-z_$][\w$]*$/;
-
-// acorn-loose's marker for a missing identifier
-const MISSING_IDENTIFIER = "✖";
+import {
+    createScriptAnalysis,
+    isIdentifierName,
+    MISSING_IDENTIFIER,
+} from "../../script-analysis";
 
 /**
  * Chapbook names that are never story variables, even when unbound.
@@ -19,12 +18,20 @@ const MISSING_IDENTIFIER = "✖";
 const excludedNames: ReadonlySet<string> = new Set(["engine", "go", "restart"]);
 
 /**
+ * Chapbook names that are always story variables when unbound, rather than
+ * conditional references.
+ */
+const storyVariableNames: ReadonlySet<string> = new Set(["config"]);
+
+/**
  * Create an extractor for Chapbook script code, per ADR-0005.
  *
  * `engine.state.get`/`set`/`setDefault` with a literal key (or a
  * never-reassigned alias of `engine.state`) yield story variables and
- * properties. Every other unbound bare name yields a conditional reference,
- * which is never an assignment. Declarations are never story variables.
+ * properties. An unbound bare `config` is a story variable, and every other
+ * unbound bare name yields a conditional reference, which is never an
+ * assignment. Escaped spellings (`g\u006Fld`) yield nothing. Declarations
+ * are never story variables.
  *
  * @param options Extractor options.
  * @param options.recordRootDeclarations True to also record root-level
@@ -73,7 +80,7 @@ export function createChapbookScriptExtractor({
                 node.arguments[0] && staticKeyName(node.arguments[0], true);
             if (!key) return;
             const segments = key.name.split(".");
-            if (!segments.every((s) => identifierRegexp.test(s))) return;
+            if (!segments.every((s) => isIdentifierName(s))) return;
 
             const assigned = method !== "get";
             let at = key.start;
@@ -106,12 +113,15 @@ export function createChapbookScriptExtractor({
                     isGlobalName(name)
                 )
                     continue;
-                const at = (ref.identifier as unknown as acorn.Node).start;
-                bareNames.set(at, {
+                const id = ref.identifier as unknown as acorn.Node;
+                if (text.slice(id.start, id.end) !== name) continue;
+                bareNames.set(id.start, {
                     text: name,
-                    at,
+                    at: id.start,
                     assigned: false,
-                    role: "conditional",
+                    ...(storyVariableNames.has(name)
+                        ? {}
+                        : { role: "conditional-reference" as const }),
                 });
             }
         }

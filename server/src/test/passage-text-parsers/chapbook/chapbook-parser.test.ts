@@ -234,7 +234,7 @@ describe("Chapbook Parser", () => {
 
             expect(result).to.eql([
                 ["a", OChapbookSymbolKind.Variable],
-                ["k", OChapbookSymbolKind.ConditionalVariable],
+                ["k", OChapbookSymbolKind.ConditionalReference],
                 ["a.b", OChapbookSymbolKind.Property],
             ]);
         });
@@ -336,8 +336,8 @@ describe("Chapbook Parser", () => {
             ]);
 
             expect(result).to.eql([
-                ["a", OChapbookSymbolKind.ConditionalVariable],
-                ["b", OChapbookSymbolKind.ConditionalVariable],
+                ["a", OChapbookSymbolKind.ConditionalReference],
+                ["b", OChapbookSymbolKind.ConditionalReference],
             ]);
         });
 
@@ -363,7 +363,33 @@ describe("Chapbook Parser", () => {
                 ["gold", OChapbookSymbolKind.RootDeclaration],
                 ["f", OChapbookSymbolKind.RootDeclaration],
                 ["C", OChapbookSymbolKind.RootDeclaration],
-                ["config", OChapbookSymbolKind.ConditionalVariable],
+                ["config", OChapbookSymbolKind.Variable],
+            ]);
+        });
+
+        it("should not index escaped spellings of bare names", () => {
+            const header = ":: Passage [script]\n";
+            const passage = "g\\u006Fld; gold;\n";
+            const callbacks = new MockCallbacks();
+            const state = buildParsingState({
+                uri: "fake-uri",
+                content: header + passage,
+                callbacks: callbacks,
+            });
+            state.currentPassage = buildPassage({ isScript: true });
+            const parser = uut.getChapbookParser(undefined);
+
+            parser?.parsePassageText(passage, header.length, state);
+
+            expect(callbacks.references).to.eql([
+                {
+                    contents: "gold",
+                    location: Location.create(
+                        "fake-uri",
+                        Range.create(1, 11, 1, 15),
+                    ),
+                    kind: OChapbookSymbolKind.ConditionalReference,
+                },
             ]);
         });
     });
@@ -1519,8 +1545,8 @@ describe("Chapbook Parser", () => {
                         .map((r) => [r.contents, r.kind]);
 
                     expect(result).to.eql([
-                        ["a", OChapbookSymbolKind.ConditionalVariable],
-                        ["b", OChapbookSymbolKind.ConditionalVariable],
+                        ["a", OChapbookSymbolKind.ConditionalReference],
+                        ["b", OChapbookSymbolKind.ConditionalReference],
                     ]);
                 });
 

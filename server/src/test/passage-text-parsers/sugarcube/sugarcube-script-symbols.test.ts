@@ -96,6 +96,9 @@ describe("SugarCube script symbols (ADR-0005)", () => {
         ]);
         expect(extract("State.variables['\\x66oo'];").vars).to.eql([]);
         expect(extract("State.variables['a b'];").vars).to.eql([]);
+        expect(extract("State.variables['café'];").vars).to.eql([
+            ["$café", "café", false, true],
+        ]);
     });
 
     it("should capture properties of a state variable", () => {

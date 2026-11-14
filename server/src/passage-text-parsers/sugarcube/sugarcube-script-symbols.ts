@@ -9,12 +9,17 @@ import {
     ScriptSymbolExtractor,
     ScriptVariableOccurrence,
 } from "../../js-parser";
-import { createScriptAnalysis, StaticName } from "../../script-analysis";
+import {
+    createScriptAnalysis,
+    isIdentifierName,
+    StaticName,
+} from "../../script-analysis";
 
 type Sigil = "$" | "_";
 
-const identifierRegexp = /^[A-Za-z_$][\w$]*$/;
-const getSetVarKeyRegexp = /^([$_])([A-Za-z_$][\w$]*)$/;
+function isSigil(text: string): text is Sigil {
+    return text === "$" || text === "_";
+}
 
 function sigilForRootName(name: string | undefined): Sigil | undefined {
     if (name === "variables") return "$";
@@ -98,7 +103,7 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
     };
 
     const addVariable = (sigil: Sigil, name: StaticName, assigned: boolean) => {
-        if (!identifierRegexp.test(name.name)) return;
+        if (!isIdentifierName(name.name)) return;
         variables.push({
             text: sigil + name.name,
             rangeText: name.name,
@@ -172,11 +177,11 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
                 if (!key) break;
                 const literal = staticKeyName(key, true);
                 if (!literal) break;
-                const match = getSetVarKeyRegexp.exec(literal.name);
-                if (!match) break;
+                const sigil = literal.name[0];
+                if (!isSigil(sigil)) break;
                 addVariable(
-                    match[1] as Sigil,
-                    { name: match[2], start: literal.start + 1 },
+                    sigil,
+                    { name: literal.name.slice(1), start: literal.start + 1 },
                     method.name === "setVar",
                 );
                 break;

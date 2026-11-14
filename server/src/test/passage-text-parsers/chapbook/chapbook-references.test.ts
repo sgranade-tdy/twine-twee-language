@@ -230,7 +230,7 @@ describe("Chapbook References", () => {
                     locations: [
                         Location.create("script-uri", Range.create(2, 0, 2, 4)),
                     ],
-                    kind: OChapbookSymbolKind.ConditionalVariable,
+                    kind: OChapbookSymbolKind.ConditionalReference,
                 },
             ];
             if (declaredInScriptPassage) {
@@ -300,7 +300,7 @@ describe("Chapbook References", () => {
                     locations: [
                         Location.create("script-uri", Range.create(2, 0, 2, 4)),
                     ],
-                    kind: OChapbookSymbolKind.ConditionalVariable,
+                    kind: OChapbookSymbolKind.ConditionalReference,
                 },
             ]);
             const parser = uut.getChapbookParser(undefined);

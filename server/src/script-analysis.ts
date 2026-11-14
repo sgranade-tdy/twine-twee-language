@@ -2,6 +2,21 @@ import * as acorn from "acorn";
 import type * as eslintScope from "eslint-scope";
 
 /**
+ * acorn-loose's marker for a missing identifier.
+ */
+export const MISSING_IDENTIFIER = "✖";
+
+const identifierNameRegexp =
+    /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u;
+
+/**
+ * Is the text a valid JavaScript IdentifierName (unescaped)?
+ */
+export function isIdentifierName(text: string): boolean {
+    return identifierNameRegexp.test(text);
+}
+
+/**
  * A statically-known name along with where it sits in the source.
  */
 export interface StaticName {
@@ -56,7 +71,11 @@ export function createScriptAnalysis(
             references.set(ref.identifier as unknown as acorn.Node, ref);
         }
     }
-    const aliasCache = new Map<eslintScope.Variable, unknown>();
+    // One cache per `rootOf`, so different root judgements never share results
+    const aliasCaches = new Map<
+        (node: acorn.Node) => unknown,
+        Map<eslintScope.Variable, unknown>
+    >();
 
     const isPlainStringSource = (node: acorn.Node, value: string): boolean =>
         text.slice(node.start + 1, node.end - 1) === value;
@@ -102,6 +121,11 @@ export function createScriptAnalysis(
         ): T | undefined {
             const variable = references.get(id)?.resolved;
             if (!variable) return undefined;
+            let aliasCache = aliasCaches.get(rootOf);
+            if (!aliasCache) {
+                aliasCache = new Map();
+                aliasCaches.set(rootOf, aliasCache);
+            }
             if (aliasCache.has(variable)) return aliasCache.get(variable) as T;
             // Guard against self-referential initializers
             aliasCache.set(variable, undefined);

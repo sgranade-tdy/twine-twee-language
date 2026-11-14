@@ -15,6 +15,7 @@ import {
     capturePreSemanticTokenFor,
 } from "./passage-text-parsers/types";
 import { Callable, calleeFlag, Sigiled, sigilFlag } from "./project-index";
+import { MISSING_IDENTIFIER } from "./script-analysis";
 import { ETokenType, TokenModifier, TokenType } from "./semantic-tokens";
 import { Label } from "./types";
 
@@ -30,12 +31,12 @@ const typeofToSemantic: Record<string, TokenType> = {
 /**
  * What a script-code variable occurrence is, when it isn't an ordinary variable.
  *
- * - `conditional`: a bare name that counts only when the project defines it
+ * - `conditional-reference`: a bare name that counts only when the project defines it
  *   elsewhere and no root-level declaration binds it (ADR-0005).
  * - `root-declaration`: a root-level declaration, recorded so conditional
  *   references can be filtered against it.
  */
-export type ScriptOccurrenceRole = "conditional" | "root-declaration";
+export type ScriptOccurrenceRole = "conditional-reference" | "root-declaration";
 
 /**
  * Label for a parsed javascript variable.
@@ -150,9 +151,6 @@ export interface TokenizedJS {
     properties: JSPropertyLabel[];
     error?: JSDiagnostic;
 }
-
-// `acorn-loose`'s marker for a missing identifier
-const MISSING_IDENTIFIER = "✖";
 
 /**
  * JavaScript global names.
@@ -1072,11 +1070,6 @@ function computeSemanticTokens(
 }
 
 /**
- * A variable occurrence found while extracting symbols, before it's turned into a `JSVariableLabel`.
- */
-type RawVariableOccurrence = ScriptVariableOccurrence;
-
-/**
  * A property occurrence found while extracting symbols, before it's turned into a `JSPropertyLabel`.
  */
 interface RawPropertyOccurrence {
@@ -1105,12 +1098,12 @@ function extractSymbols(
     isGlobalName: IsGlobalName,
     isAssignmentContext: boolean,
 ): {
-    variables: RawVariableOccurrence[];
+    variables: ScriptVariableOccurrence[];
     properties: RawPropertyOccurrence[];
 } {
     // Keyed by position so that, when converted to an array below, occurrences
     // come out in ascending source position order
-    const variableTokens: Record<number, RawVariableOccurrence> = {};
+    const variableTokens: Record<number, ScriptVariableOccurrence> = {};
     const propertyTokens: Record<number, RawPropertyOccurrence> = {};
 
     // Helper function to add a variable occurrence if it's an unbound (story)

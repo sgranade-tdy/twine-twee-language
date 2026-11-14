@@ -61,14 +61,14 @@ describe("Chapbook Diagnostics", () => {
                     locations: [
                         Location.create("fake-uri", Range.create(1, 2, 3, 4)),
                     ],
-                    kind: OChapbookSymbolKind.ConditionalVariable,
+                    kind: OChapbookSymbolKind.ConditionalReference,
                 },
                 {
                     contents: "var2",
                     locations: [
                         Location.create("fake-uri", Range.create(5, 2, 5, 4)),
                     ],
-                    kind: OChapbookSymbolKind.ConditionalVariable,
+                    kind: OChapbookSymbolKind.ConditionalReference,
                 },
                 {
                     contents: "var2",
