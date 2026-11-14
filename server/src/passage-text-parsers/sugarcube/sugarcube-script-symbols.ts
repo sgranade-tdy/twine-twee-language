@@ -13,6 +13,7 @@ import {
 
 type Sigil = "$" | "_";
 
+const identifierRegexp = /^[A-Za-z_$][\w$]*$/;
 const getSetVarKeyRegexp = /^([$_])([A-Za-z_$][\w$]*)$/;
 
 /**
@@ -180,6 +181,7 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
     };
 
     const addVariable = (sigil: Sigil, name: StaticName, assigned: boolean) => {
+        if (!identifierRegexp.test(name.name)) return;
         variables.push({
             text: sigil + name.name,
             rangeText: name.name,
