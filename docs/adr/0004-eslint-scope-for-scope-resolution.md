@@ -27,6 +27,7 @@ the story-format seam. Highlighting doesn't use scope analysis.
 - **Story-variable rule.** `globalScope.through` alone isn't the set. A story
   variable is a reference that is unresolved _or_ resolves to a global-scope or
   module-scope variable, because root-level declarations are story state.
+  _Struck by ADR-0005: declarations are never story variables._
 - **`ecmaVersion` must be numeric.** eslint-scope compares it numerically, so
   `"latest"` silently gives ES5 scoping. Acorn keeps a renamed `EcmaVersion`
   as `ParseEcmaVersion = "latest"` and eslint-scope gets a separate numeric

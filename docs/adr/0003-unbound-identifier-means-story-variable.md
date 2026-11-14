@@ -1,6 +1,6 @@
 # An identifier unbound within its snippet is a story variable
 
-Status: accepted
+Status: accepted for expression code; superseded by ADR-0005 for script code
 
 Twine story formats give authors variables that live in engine state, but in the
 JavaScript embedded in a passage those are just bare identifiers — there is no

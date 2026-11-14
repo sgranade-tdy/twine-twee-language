@@ -51,10 +51,32 @@ The other half of `server/src/js-parser.ts`: finding the names in a passage's
 JavaScript that belong to the _story_, so they can be indexed, cross-referenced
 and renamed.
 
-**Story variable**: a name in a passage's JavaScript that holds story state the
-author controls. Recognized by being unbound within the snippet the parser was
-handed — see ADR-0003 — not by any list of known names. _Avoid_: "global", which
-names the heuristic rather than the thing.
+**Story variable**: a name that holds story state the author controls. How a
+story variable is spelled depends on the code it appears in. In expression code
+(macro arguments, vars sections), a name unbound within the snippet is a story
+variable; see ADR-0003. In script code (Story JavaScript, `script` passages,
+script blocks, story script files, included scripts), a story variable is
+reached only through the format's state API (SugarCube `State.variables.x`,
+Chapbook `engine.state.get('x')`). The one exception is Chapbook, where a bare
+name also counts if the project already defines that variable. _Avoid_:
+"global", which names the heuristic rather than the thing.
+
+**Sigil**: the leading character of a SugarCube variable name in twee: `$` for a
+story variable kept in story state, `_` for a temporary variable cleared on each
+passage. The sigil picks the store, so it's part of the variable's identity, not
+its spelling. Script code reaches the same stores through different state roots
+and doesn't write the sigil (except inside `getVar`/`setVar` strings).
+
+**Conditional reference**: a bare name in Chapbook script code that refers to a
+story variable only when the project sets that variable elsewhere and no
+root-level declaration in Story JavaScript binds it. Whether it counts can change
+when other files change, without the name itself changing. _Avoid_: "candidate".
+
+**State root**: an expression the story format provides that reaches story state
+from script code: SugarCube `State.variables`, `State.temporary`, `variables()`,
+`temporary()`, `SugarCube.State.*`, `getVar`/`setVar`, and Chapbook
+`engine.state`. A binding that is initialized to a state root and never
+reassigned is also a state root. _Avoid_: "accessor", "prefix".
 
 **Host global**: a global the browser or a bundled library provides (`document`,
 `location`, `$`), as opposed to JavaScript's own globals (`Math`, `parseInt`).
@@ -67,6 +89,16 @@ a host global, but Chapbook's bare names can (`location`, `history`).
 `setup`, SugarCube's `either()` and `visited()`). Not a host global. Per ADR-0003
 the story-format parser decides which ones aren't story variables; it may hand
 some to `js-parser.ts` in the same exclusion set as its host globals.
+
+**Story script file**: a `.js` file matched by the project's `storySourceFiles`
+(and not by `ignores`), compiled into the built story as Story JavaScript. Treated
+as a `script`-tagged passage that happens to live in its own file. _Avoid_:
+"external JS", "local JS".
+
+**Included script**: a `.js` file under the project's `includeSourcePaths` (and
+not matched by `ignores`), copied alongside the built story. It runs only if
+something loads it at runtime, such as SugarCube's `importScripts()`. _Avoid_:
+"external JS", "local JS".
 
 **Story property**: a member reached from a story variable, carried with the full
 dotted path that reaches it (`prefix` + name). A property whose path can't be
@@ -93,9 +125,9 @@ global or story-format built-in, which are bare names, not properties.
 **Assignment**: an occurrence the parser _counts_ as writing the name (`$x = 1`,
 `$x.y = 1`), as evidence that the story variable gets set. Twine variables are
 never declared, so this is the only creation signal the parser has. Three things
-count: a root-level **declaration**, always; write-shaped syntax inside an
-**assignment context**; and occurrences a story format forces to be writes (the
-Chapbook vars section, SugarCube receivers). A write the parser doesn't count,
+count: write-shaped syntax inside an **assignment context**, and occurrences a
+story format forces to be writes (the Chapbook vars section, SugarCube receivers,
+`setVar`, `engine.state.set`). A write the parser doesn't count,
 such as `<<print $x = 1>>`, is a read. _Avoid_: "definition", which implies a
 declaration site that Twine JavaScript doesn't have.
 
@@ -105,9 +137,9 @@ destructuring and `for` targets) counts as an assignment. Outside one, an
 assignment is more often a `==` typo or a side effect buried in a read, so the
 parser under-reports. _SugarCube code calls this a setter context._
 
-**Declaration**: a JavaScript binding form — `var`/`let`/`const`, `function`,
-`class`. Unambiguous where an assignment isn't, so a root-level declaration is an
-assignment regardless of what the caller asked for.
+**Declaration**: a JavaScript binding form: `var`/`let`/`const`, `function` or
+`class`. Every story format keeps declarations out of story state, so a
+declared name is never a story variable, even at the root of a script.
 
 **Resolvable chain**: a member expression whose every segment has a statically
 known name, rooted in an identifier. `$a.b['c']` is resolvable; `$a().b` and
