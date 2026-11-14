@@ -3,12 +3,15 @@ import { Location, Position } from "vscode-languageserver";
 import { ProjectIndex } from "../../project-index";
 import { OChapbookSymbolKind } from "./types";
 
-const linkedTypes = {
-    [OChapbookSymbolKind.Variable]: OChapbookSymbolKind.VariableSet,
-    [OChapbookSymbolKind.VariableSet]: OChapbookSymbolKind.Variable,
-    [OChapbookSymbolKind.Property]: OChapbookSymbolKind.PropertySet,
-    [OChapbookSymbolKind.PropertySet]: OChapbookSymbolKind.Property,
-};
+// Kinds whose references all refer to the same thing
+const linkedKindGroups: number[][] = [
+    [
+        OChapbookSymbolKind.Variable,
+        OChapbookSymbolKind.VariableSet,
+        OChapbookSymbolKind.ConditionalVariable,
+    ],
+    [OChapbookSymbolKind.Property, OChapbookSymbolKind.PropertySet],
+];
 
 /**
  * Get a predicate that says whether a conditional reference (a bare name in
@@ -50,12 +53,11 @@ export function isDisqualifiedConditionalAt(
     documentUri: string,
     position: Position,
     index: ProjectIndex,
+    qualifies?: (name: string) => boolean,
 ): boolean {
     const ref = index.getAllReferencesAt(documentUri, position);
-    return (
-        ref?.kind === OChapbookSymbolKind.ConditionalVariable &&
-        !conditionalReferenceQualifier(index)(ref.contents)
-    );
+    if (ref?.kind !== OChapbookSymbolKind.ConditionalVariable) return false;
+    return !(qualifies ?? conditionalReferenceQualifier(index))(ref.contents);
 }
 
 export function getReferencesToSymbolAt(
@@ -64,7 +66,8 @@ export function getReferencesToSymbolAt(
     index: ProjectIndex,
     includeDeclaration: boolean,
 ): Location[] | undefined {
-    if (isDisqualifiedConditionalAt(documentUri, position, index))
+    const qualifies = conditionalReferenceQualifier(index);
+    if (isDisqualifiedConditionalAt(documentUri, position, index, qualifies))
         return undefined;
 
     // Because we track variable references separately from variable-being-set locations,
@@ -78,24 +81,11 @@ export function getReferencesToSymbolAt(
     const kind = refs?.kind;
     if (refs === undefined || kind === undefined) return refs?.locations;
 
-    // Variable-ish references are all references to one variable, and so is
-    // any conditional reference that qualifies
-    const isVariableKind =
-        kind === OChapbookSymbolKind.Variable ||
-        kind === OChapbookSymbolKind.VariableSet ||
-        kind === OChapbookSymbolKind.ConditionalVariable;
-    const otherKinds: number[] = isVariableKind
-        ? [
-              OChapbookSymbolKind.Variable,
-              OChapbookSymbolKind.VariableSet,
-              OChapbookSymbolKind.ConditionalVariable,
-          ].filter((k) => k !== kind)
-        : Object.keys(linkedTypes).includes(kind.toString())
-          ? [linkedTypes[kind as keyof typeof linkedTypes]]
-          : [];
+    const otherKinds = (
+        linkedKindGroups.find((group) => group.includes(kind)) ?? []
+    ).filter((k) => k !== kind);
     if (otherKinds.length === 0) return refs.locations;
 
-    const qualifies = conditionalReferenceQualifier(index);
     const locations: Location[] = refs.locations;
     for (const uri of index.getIndexedUris()) {
         for (const otherKind of otherKinds) {
