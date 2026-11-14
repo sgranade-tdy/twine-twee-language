@@ -18,6 +18,7 @@ import { ProjectIndex, ProjSymbol } from "../../project-index";
 import { ETokenModifier, ETokenType } from "../../semantic-tokens";
 import { eraseMatches, versionCompare } from "../../utilities";
 import { allMacros, MacroInfo, MacroParent } from "./macros";
+import { extractSugarCubeScriptSymbols } from "./sugarcube-script-symbols";
 import { createVariableAndPropertyReferences } from "./sugarcube-utils";
 import {
     MacroParse,
@@ -130,7 +131,10 @@ function parseAsJavaScript(
             textIndex,
             state.textDocument,
             sugarcubeState,
-            { isAssignmentContext: true },
+            {
+                isAssignmentContext: true,
+                extractScriptSymbols: extractSugarCubeScriptSymbols,
+            },
         ),
         state,
         sugarcubeState,
