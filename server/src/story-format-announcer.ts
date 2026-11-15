@@ -1,17 +1,7 @@
-import { StoryFormat } from "@tt3/shared";
+import { StoryFormat, storyFormatsDiffer } from "@tt3/shared";
 
 /** How long to wait after the last story format edit before reacting to it. */
 export const storyFormatEditDebounceMs = 300;
-
-/**
- * Do two story formats differ in format or version?
- */
-export function storyFormatsDiffer(
-    a: StoryFormat | undefined,
-    b: StoryFormat | undefined,
-): boolean {
-    return a?.format !== b?.format || a?.formatVersion !== b?.formatVersion;
-}
 
 /**
  * Everything the announcer needs from the outside world.

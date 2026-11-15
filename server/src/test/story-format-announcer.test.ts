@@ -69,6 +69,20 @@ describe("Story format announcer", () => {
         expect(h.reindexes).to.equal(0);
     });
 
+    it("should not re-announce when an edit only changes the format name's case", () => {
+        const h = harness();
+        h.edit({ format: "Sugarcube", formatVersion: "2.36.1" });
+        fakeClock.tick(storyFormatEditDebounceMs);
+        h.announced = [];
+        h.reindexes = 0;
+
+        h.edit({ format: "SugarCube", formatVersion: "2.36.1" });
+        fakeClock.tick(storyFormatEditDebounceMs);
+
+        expect(h.announced).to.be.empty;
+        expect(h.reindexes).to.equal(0);
+    });
+
     it("should announce a format found during a workspace index at once", () => {
         const h = harness();
 

@@ -38,6 +38,7 @@ import {
     ReadFileRequest,
     StatFileRequest,
     StoryFormat,
+    storyFormatsDiffer,
 } from "@tt3/shared";
 import { generateCompletions } from "./completions";
 import { getDefinitionAt } from "./definition";
@@ -62,10 +63,7 @@ import {
     WorkspaceFileTracker,
 } from "./workspace-file-tracker";
 import { ScriptFeatureRegistrar } from "./script-file-registration";
-import {
-    StoryFormatAnnouncer,
-    storyFormatsDiffer,
-} from "./story-format-announcer";
+import { StoryFormatAnnouncer } from "./story-format-announcer";
 import { getSugarCubeMacroInfo } from "./passage-text-parsers/sugarcube";
 import {
     setCustomMacrosAndEnums,

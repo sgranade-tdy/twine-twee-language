@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 import { URI, Utils } from "vscode-uri";
 
-import { StoryFormat } from "@tt3/shared";
+import { StoryFormat, storyFormatsDiffer } from "@tt3/shared";
 import { currentConfig } from "./config";
 import { WorkspaceProvider } from "./workspace-provider";
 
@@ -34,10 +34,7 @@ export function onlyNewStoryFormats(
 ): (format: StoryFormat) => Promise<void> {
     let last: StoryFormat | undefined;
     return async (format) => {
-        if (
-            format.format === last?.format &&
-            format.formatVersion === last?.formatVersion
-        ) {
+        if (!storyFormatsDiffer(format, last)) {
             return;
         }
         last = format;

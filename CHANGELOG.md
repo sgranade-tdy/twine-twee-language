@@ -51,6 +51,7 @@ Three big changes:
 - SugarCube: No longer incorrectly indexes apparent variables in non-data HTML attributes.
 - SugarCube: Now correctly places the end of diagnostic squiggles on TwineScript expressions.
 - Typing a new story format or version in StoryData no longer triggers a download prompt and reindex for every intermediate value.
+- Changing only the capitalization of a story format's name (e.g. `Sugarcube` → `SugarCube`) no longer re-downloads or reindexes.
 
 ## [1.1.5] - 2026 04 12
 

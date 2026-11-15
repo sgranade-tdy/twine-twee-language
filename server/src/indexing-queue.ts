@@ -1,9 +1,8 @@
 import { TextDocument } from "vscode-languageserver-textdocument";
 
-import { ProjectFiles, StoryFormat } from "@tt3/shared";
+import { ProjectFiles, StoryFormat, storyFormatsDiffer } from "@tt3/shared";
 import { ParseLevel } from "./parser-types";
 import { Index, ScriptFileRole, scriptFileRoles } from "./project-index";
-import { storyFormatsDiffer } from "./story-format-announcer";
 
 /**
  * Everything the indexing queue needs from the outside world.
