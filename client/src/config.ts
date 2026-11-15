@@ -105,6 +105,13 @@ export function updateConfig(newConfig: Tt3Config): string | undefined {
 }
 
 /**
+ * Reset the project's config to schema defaults.
+ */
+export function resetConfig() {
+    currentConfig = Tt3ConfigSchema.parse({});
+}
+
+/**
  * Update the extension's config from JSON.
  *
  * @param contents JSON contents of the config file.

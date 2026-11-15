@@ -7,10 +7,11 @@
   - **File missing:** reset to schema defaults. Legacy settings are not migrated again, and the file isn't recreated.
   - Either way, send one reindex request. Once ticket 21 lands, that reindex re-resolves the file sets and re-registers the `.js` selector.
 - The config location and multi-root behaviour are unchanged.
+- A file that parses but lists unknown diagnostic codes isn't invalid. It applies with those codes dropped and shows the existing error, so one typo doesn't hold back the rest of the file.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Creating the file behaves like changing it
 - [ ] Deleting it resets to schema defaults and sends a reindex
