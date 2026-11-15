@@ -10,11 +10,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A burst of StoryData edits that changes the format several times sends one `UpdatedStoryFormat` and requests one workspace reindex, for the final format (fake timers)
-- [ ] An edit burst that ends on the format already announced sends nothing and requests no reindex
-- [ ] A format change found during a workspace index is still announced at once
-- [ ] A second `UpdatedStoryFormat` for the same format, arriving while the first download prompt is still open, raises no second prompt
+- [x] A burst of StoryData edits that changes the format several times sends one `UpdatedStoryFormat` and requests one workspace reindex, for the final format (fake timers)
+- [x] An edit burst that ends on the format already announced sends nothing and requests no reindex
+- [x] A format change found during a workspace index is still announced at once
+- [x] A second `UpdatedStoryFormat` for the same format, arriving while the first download prompt is still open, raises no second prompt
 
 ## Comments

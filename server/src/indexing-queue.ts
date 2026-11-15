@@ -3,6 +3,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import { ProjectFiles, StoryFormat } from "@tt3/shared";
 import { ParseLevel } from "./parser-types";
 import { Index, ScriptFileRole, scriptFileRoles } from "./project-index";
+import { storyFormatsDiffer } from "./story-format-announcer";
 
 /**
  * Everything the indexing queue needs from the outside world.
@@ -44,16 +45,6 @@ export interface IndexingQueueDeps {
 
 const interval = 200; // Interval between calling the run function, in ms
 const minTimeBetween = 50; // Minimum time to wait between runs, in ms
-
-/**
- * Do two story formats differ in format or version?
- */
-function storyFormatsDiffer(
-    a: StoryFormat | undefined,
-    b: StoryFormat | undefined,
-): boolean {
-    return a?.format !== b?.format || a?.formatVersion !== b?.formatVersion;
-}
 
 /**
  * Runs potentially long-running indexing tasks that shouldn't run concurrently.

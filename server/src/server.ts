@@ -62,6 +62,10 @@ import {
     WorkspaceFileTracker,
 } from "./workspace-file-tracker";
 import { ScriptFeatureRegistrar } from "./script-file-registration";
+import {
+    StoryFormatAnnouncer,
+    storyFormatsDiffer,
+} from "./story-format-announcer";
 import { getSugarCubeMacroInfo } from "./passage-text-parsers/sugarcube";
 import {
     setCustomMacrosAndEnums,
@@ -98,7 +102,7 @@ const indexingQueue: IndexingQueue = new IndexingQueue({
         parseTextDocument(doc, level, reindex),
     validateDocument: (doc) => validateTextDocument(doc),
     sendDecorationRanges: (uri) => sendDecorationRanges(uri),
-    onStoryFormatChange: (format) => onStoryFormatChange(format),
+    onStoryFormatChange: (format) => storyFormatAnnouncer.announceNow(format),
     processAllOpenDocuments: () => processAllOpenDocuments(),
     parseMacroFile: (uri) => parseT3LTMacroFile(uri),
     onMacroChanges: () => onSCMacroChanges(),
@@ -111,6 +115,12 @@ const indexingQueue: IndexingQueue = new IndexingQueue({
         void scriptRegistrar?.update(projectIndex.getScriptFileUris());
     },
     logError: (message) => connection.console.error(message),
+});
+
+const storyFormatAnnouncer = new StoryFormatAnnouncer({
+    getStoryFormat: () => projectIndex.getStoryData()?.storyFormat,
+    announce: (format) => onStoryFormatChange(format),
+    reindexWorkspace: () => indexingQueue.indexWorkspace(),
 });
 
 const fileTracker: WorkspaceFileTracker = new WorkspaceFileTracker({
@@ -456,7 +466,7 @@ async function fetchFile(
  *
  * @param document Document to process.
  * @param parseLevel What level of parsing to do.
- * @param reindexOnStoryFormatChange If true and the story format changes, re-index all project files.
+ * @param reindexOnStoryFormatChange If true and the story format changes, react after a debounce and re-index all project files; if false, react at once.
  */
 async function parseTextDocument(
     document: TextDocument,
@@ -477,12 +487,13 @@ async function parseTextDocument(
     }
     if (
         newStoryFormat?.format &&
-        (newStoryFormat?.format !== storyFormat?.format ||
-            newStoryFormat?.formatVersion !== storyFormat?.formatVersion)
+        storyFormatsDiffer(newStoryFormat, storyFormat)
     ) {
-        onStoryFormatChange(newStoryFormat);
         if (reindexOnStoryFormatChange) {
-            indexingQueue.indexWorkspace();
+            // Debounced, so typing a new format doesn't react to each keystroke
+            storyFormatAnnouncer.formatEdited();
+        } else {
+            storyFormatAnnouncer.announceNow(newStoryFormat);
         }
     }
 
