@@ -82,9 +82,30 @@ export function shorthandFlag(source: Shorthand): Shorthand {
 }
 
 /**
+ * Tracks whether an assignment is an opaque assignment: one whose value
+ * could be an object of unknown shape.
+ */
+export interface Opaque {
+    /**
+     * True if the occurrence is an opaque assignment, so story properties
+     * beneath its path are never reported as never set.
+     */
+    opaque?: boolean;
+}
+
+/**
+ * Spread-ready `opaque` flag that's absent unless true, keeping indexed
+ * shapes sparse.
+ */
+export function opaqueFlag(source: Opaque): Opaque {
+    return source.opaque ? { opaque: true } : {};
+}
+
+/**
  * A label with a number that identifies the kind of label it is.
  */
-export interface ProjSymbol extends Label, Kind, Callable, Sigiled, Shorthand {}
+export interface ProjSymbol
+    extends Label, Kind, Callable, Sigiled, Shorthand, Opaque {}
 
 /**
  * Kind of a Twine symbol.
@@ -98,7 +119,7 @@ export enum TwineSymbolKind {
 /**
  * References, which have contents, locations, and an identifier for its kind.
  */
-export interface References extends Kind, Callable, Sigiled, Shorthand {
+export interface References extends Kind, Callable, Sigiled, Shorthand, Opaque {
     contents: string;
     locations: Location[];
 }

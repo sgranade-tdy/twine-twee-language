@@ -70,8 +70,53 @@ function getAssignedNames(
 }
 
 /**
+ * Collect the paths of every opaque assignment in the project.
+ *
+ * @param index Project index.
+ * @param assignmentKinds Story format's symbol kinds for an assignment.
+ * @returns Set of opaque paths.
+ */
+function getOpaquePaths(
+    index: ProjectIndex,
+    assignmentKinds: number[],
+): Set<string> {
+    const paths = new Set<string>();
+    for (const uri of index.getIndexedUris()) {
+        for (const kind of assignmentKinds) {
+            for (const ref of index.getReferences(uri, kind) ?? []) {
+                if (ref.opaque) paths.add(ref.contents);
+            }
+        }
+    }
+    return paths;
+}
+
+/**
+ * Is a property beneath (but not at) any opaque path?
+ *
+ * @param property Property's full dotted path.
+ * @param opaquePaths Opaque paths.
+ * @returns True if the property is beneath an opaque path.
+ */
+function isBeneathOpaquePath(
+    property: string,
+    opaquePaths: Set<string>,
+): boolean {
+    for (
+        let end = property.lastIndexOf(".");
+        end > 0;
+        end = property.lastIndexOf(".", end - 1)
+    ) {
+        if (opaquePaths.has(property.slice(0, end))) return true;
+    }
+    return false;
+}
+
+/**
  * Generate diagnostics for story variables and properties in a document that
  * are never set anywhere in the project.
+ *
+ * Properties beneath an opaque assignment's path are never reported.
  *
  * @param uri URI of the document to check.
  * @param index Project index.
@@ -95,6 +140,10 @@ export function generateNeverSetDiagnostics(
         check.propertySetKind,
         check.builtInProperties,
     );
+    const opaquePaths = getOpaquePaths(index, [
+        check.variableSetKind,
+        check.propertySetKind,
+    ]);
 
     for (const varRef of index.getReferences(uri, check.variableKind) ?? []) {
         if (!varSetNames.has(varRef.contents)) {
@@ -111,7 +160,8 @@ export function generateNeverSetDiagnostics(
     for (const propRef of index.getReferences(uri, check.propertyKind) ?? []) {
         if (
             !propSetNames.has(propRef.contents) &&
-            !isBuiltinJSProperty(propRef)
+            !isBuiltinJSProperty(propRef) &&
+            !isBeneathOpaquePath(propRef.contents, opaquePaths)
         ) {
             diagnostics.push(
                 ...referencesToDiagnostics(
