@@ -44,21 +44,19 @@ function hasOwnScope(index: ProjectIndex, uri: string): boolean {
 export function conditionalReferenceQualifier(
     index: ProjectIndex,
 ): (name: string, uri: string) => boolean {
-    const defined = new Set<string>();
-    const declared = new Set<string>();
-    for (const uri of index.getIndexedUris()) {
-        for (const ref of index.getReferences(
-            uri,
-            OChapbookSymbolKind.VariableSet,
-        ) ?? [])
-            defined.add(ref.contents);
-        if (hasOwnScope(index, uri)) continue;
-        for (const ref of index.getReferences(
-            uri,
-            OChapbookSymbolKind.RootDeclaration,
-        ) ?? [])
-            declared.add(ref.contents);
-    }
+    const defined = new Set(
+        index
+            .getProjectReferences([OChapbookSymbolKind.VariableSet])
+            .map((ref) => ref.contents),
+    );
+    const declared = new Set(
+        index
+            .getProjectReferences(
+                [OChapbookSymbolKind.RootDeclaration],
+                (uri) => !hasOwnScope(index, uri),
+            )
+            .map((ref) => ref.contents),
+    );
     return (name, uri) =>
         defined.has(name) && (hasOwnScope(index, uri) || !declared.has(name));
 }
@@ -107,20 +105,16 @@ export function getReferencesToSymbolAt(
     ).filter((k) => k !== kind);
     if (otherKinds.length === 0) return refs.locations;
 
-    const locations: Location[] = refs.locations;
-    for (const uri of index.getIndexedUris()) {
-        for (const otherKind of otherKinds) {
-            if (
-                otherKind === OChapbookSymbolKind.ConditionalReference &&
-                !qualifies(refs.contents, uri)
+    const otherLocations = otherKinds.flatMap((otherKind) =>
+        index
+            .getProjectReferences(
+                [otherKind],
+                (uri) =>
+                    otherKind !== OChapbookSymbolKind.ConditionalReference ||
+                    qualifies(refs.contents, uri),
             )
-                continue;
-            for (const otherRef of index.getReferences(uri, otherKind) ?? []) {
-                if (otherRef.contents === refs.contents)
-                    locations.push(...otherRef.locations);
-            }
-        }
-    }
-
-    return locations;
+            .filter((otherRef) => otherRef.contents === refs.contents)
+            .flatMap((otherRef) => otherRef.locations),
+    );
+    return [...refs.locations, ...otherLocations];
 }
