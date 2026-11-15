@@ -8,7 +8,9 @@
 
 **Blocked by:** 21
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Go-to-definition on a `.tw` read lands on a `.js` assignment, in both formats
-- [ ] Go-to-definition on a `.tw` read lands on a `.tw` set
+**Decision:** the definition is every location that sets the variable (`.tw` and `.js`), returned as a list. Starting from a set lands on all sets, including itself. A Chapbook bare name that a root declaration binds has no definition.
+
+- [x] Go-to-definition on a `.tw` read lands on a `.js` assignment, in both formats
+- [x] Go-to-definition on a `.tw` read lands on a `.tw` set

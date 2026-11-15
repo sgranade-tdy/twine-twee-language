@@ -668,6 +668,30 @@ describe("Indexer", () => {
             expect(qualifiesNow("gold", "file:///bare.js")).to.be.true;
         });
 
+        it("should not go to a story variable's sets from a bare name a root declaration binds", () => {
+            const index = indexWithFormat("Chapbook", "2.3.0");
+            for (const [uri, content] of [
+                ["file:///set.js", "engine.state.set('gold', 1);"],
+                ["file:///declares.js", "var gold = 2;"],
+                ["file:///story.js", "gold;"],
+            ]) {
+                uut.updateScriptFileIndex(
+                    buildDocument({ uri, content }),
+                    "story-script",
+                    ParseLevel.Full,
+                    index,
+                );
+            }
+
+            const result = getDefinitionAt(
+                buildDocument({ uri: "file:///story.js", content: "gold;" }),
+                Position.create(0, 1),
+                index,
+            );
+
+            expect(result).to.be.undefined;
+        });
+
         describe("From a Twee file", () => {
             function indexSugarCubeProject(): Index {
                 const index = new Index();
@@ -721,8 +745,7 @@ describe("Indexer", () => {
                 ]);
             });
 
-            // Pending ticket 29: story variables have no go-to-definition yet
-            it.skip("should go to a definition in a script file", () => {
+            it("should go to a definition in a script file", () => {
                 const index = indexSugarCubeProject();
                 const story = buildDocument({
                     uri: "file:///story.tw",
@@ -738,6 +761,73 @@ describe("Indexer", () => {
                 expect(result).to.deep.include(
                     Location.create("file:///s.js", Range.create(0, 16, 0, 20)),
                 );
+            });
+
+            it("should go to a Chapbook definition in a script file", () => {
+                const index = new Index();
+                uut.updateProjectIndex(
+                    buildDocument({
+                        uri: "file:///story.tw",
+                        content:
+                            ':: StoryData\n{"ifid": "x", "format": "Chapbook", "format-version": "2.3.0"}\n\n:: Start\nYou have {gold} coins.\n',
+                    }),
+                    ParseLevel.Full,
+                    index,
+                );
+                uut.updateScriptFileIndex(
+                    buildDocument({
+                        uri: "file:///s.js",
+                        content: "engine.state.set('gold', 1);",
+                    }),
+                    "story-script",
+                    ParseLevel.Full,
+                    index,
+                );
+                const story = buildDocument({
+                    uri: "file:///story.tw",
+                    content: "",
+                });
+
+                const result = getDefinitionAt(
+                    story,
+                    Position.create(4, 11),
+                    index,
+                );
+
+                expect(result).to.eql([
+                    Location.create("file:///s.js", Range.create(0, 18, 0, 22)),
+                ]);
+            });
+
+            it("should go to every place a story variable is set, including Twee files", () => {
+                const index = indexSugarCubeProject();
+                uut.updateProjectIndex(
+                    buildDocument({
+                        uri: "file:///set.tw",
+                        content: ":: Setup\n<<set $gold to 5>>\n",
+                    }),
+                    ParseLevel.Full,
+                    index,
+                );
+                const story = buildDocument({
+                    uri: "file:///story.tw",
+                    content: "",
+                });
+
+                const result = getDefinitionAt(
+                    story,
+                    Position.create(4, 11),
+                    index,
+                );
+
+                expect(result).to.have.deep.members([
+                    Location.create(
+                        "file:///set.tw",
+                        Range.create(1, 6, 1, 11),
+                    ),
+                    Location.create("file:///s.js", Range.create(0, 16, 0, 20)),
+                    Location.create("file:///i.js", Range.create(1, 16, 1, 20)),
+                ]);
             });
         });
     });

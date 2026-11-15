@@ -13,13 +13,13 @@ const storyData =
     ':: StoryData\n{"ifid": "x", "format": "SugarCube", "format-version": "2.36.1"}\n\n';
 
 describe("Working from .js files", () => {
-    function build(js: string) {
+    function build(js: string, passageText = "<<print $gold>>") {
         const index = new Index();
         const tw = TextDocument.create(
             "file:///story.tw",
             "twee3",
             1,
-            storyData + ":: Start\n<<print $gold>>\n",
+            storyData + `:: Start\n${passageText}\n`,
         );
         const script = TextDocument.create("file:///s.js", "javascript", 1, js);
         updateProjectIndex(tw, ParseLevel.Full, index);
@@ -43,9 +43,11 @@ describe("Working from .js files", () => {
         ]);
     });
 
-    // Pending ticket 29: story variables have no go-to-definition yet
-    it.skip("should go from a story variable in a .js file to its .tw and .js occurrences", () => {
-        const { index, script } = build("State.variables.gold = 2;\n");
+    it("should go from a story variable in a .js file to where it's set in .tw and .js files", () => {
+        const { index, script } = build(
+            "State.variables.gold = 2;\n",
+            "<<set $gold to 1>>",
+        );
 
         const definition = getDefinitionAt(
             script,
