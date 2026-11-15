@@ -23,3 +23,9 @@
 - [ ] Deleting the StoryData file triggers one workspace reindex, and the story format is cleared or rediscovered
 - [ ] The client no longer sends file-operation notifications
 - [ ] Tracker tests use fakes and assert observable index and diagnostic results
+
+## Comments
+
+- Create events are debounced here, not in 26: the tracker waits `fileSetResolveDebounceMs` (300 ms) after the last create, then re-resolves the file sets once and indexes the created files that landed in them. Re-resolves are serialized, so a slow one can't overwrite a newer result.
+- The tracker keeps only the resolved Twee file set. The story-script and included-script sets are left for 26, which is the first ticket that reads them.
+- If resolving the file sets fails, the tracker logs the error and drops the event. It doesn't fall back to a workspace reindex, because the reindex would make the same failing request.

@@ -25,3 +25,8 @@
 - [ ] A burst of create events causes one re-resolve
 - [ ] `.js` files outside the resolved sets are ignored
 - [ ] Closing an edited, unsaved `.js` buffer restores the on-disk contents in the index, and `variable-never-set` in open `.tw` files updates
+
+## Comments
+
+- From 25: the debounced re-resolve on create already exists (`fileSetResolveDebounceMs` and `flushPendingCreates` in `server/src/workspace-file-tracker.ts`), with serialized resolves. Extend it to `.js` creates rather than adding a second debounce.
+- From 25: the tracker stores only the Twee file set (`tweeFiles`). Diffing needs the old story-script and included-script sets, so add them to what `setFileSets` keeps.

@@ -10,4 +10,4 @@ This repository uses a single-context domain documentation layout. See `docs/age
 
 ### Running tests
 
-`npm test` runs the whole suite. `.mocharc.json` lists every test file under `spec`, so `npx mocha --import=tsx <file>` also runs all of them. To run one file, bypass the config: `npx mocha --no-config --extension ts --import=tsx server/src/test/<file>.test.ts`.
+`npm test` runs the whole suite. `.mocharc.json` lists every test file under `spec`, so `npx mocha --require tsx <file>` also runs all of them. To run one file, bypass the config: `npx mocha --no-config --extension ts --require tsx server/src/test/<file>.test.ts` (`--import=tsx` fails on tests that import `validator.ts`).

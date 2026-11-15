@@ -152,3 +152,12 @@ prefix renames the wrong thing.
 **Diagnostic code**: a member of `DiagnosticCodes`, with default message and
 severity in `DiagnosticMetadata` (`server/src/diagnostics.ts`). User-facing and
 individually disableable — which is why codes stay coarse.
+
+## Workspace files
+
+**Resolved file sets**: the three URI lists the client resolves from the
+project's configuration: Twee files, story script files and included scripts
+(`ProjectFiles` in code). The server re-resolves them on every workspace index
+and after a file is created. A watcher event matters only if its URI is in one
+of the sets, so ignored files stay out of the index. _Avoid_: "project files",
+which suggests every file in the folder.
