@@ -4,8 +4,8 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] One shared never-set check is used by both SugarCube and Chapbook diagnostics
-- [ ] Format-specific messages, built-in variables/properties and symbol kinds are still honoured
-- [ ] All existing diagnostics tests pass unchanged
+- [x] One shared never-set check is used by both SugarCube and Chapbook diagnostics
+- [x] Format-specific messages, built-in variables/properties and symbol kinds are still honoured
+- [x] All existing diagnostics tests pass unchanged
