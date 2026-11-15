@@ -30,3 +30,5 @@
 
 - From 25: the debounced re-resolve on create already exists (`fileSetResolveDebounceMs` and `flushPendingCreates` in `server/src/workspace-file-tracker.ts`), with serialized resolves. Extend it to `.js` creates rather than adding a second debounce.
 - From 25: the tracker stores only the Twee file set (`tweeFiles`). Diffing needs the old story-script and included-script sets, so add them to what `setFileSets` keeps.
+- Follow-up from review: deletes of `.tw` and `.js` files follow one rule. A delete of a file the index holds removes it at once, with no re-resolve. Revalidation, `.js` re-registration and (for StoryData) the workspace reindex wait for the create/delete debounce (`fileEventDebounceMs`), so a folder delete revalidates once and a `.tw` rename no longer flickers missing-passage diagnostics. A failed re-resolve still re-registers and revalidates for the deletes. Spec lines on Removal and Watcher events updated to match.
+- Follow-up from review: the server's response to edit-driven story-format changes isn't debounced; see `.scratch/story-format-change-prompts/issues/01-debounce-story-format-change.md`.

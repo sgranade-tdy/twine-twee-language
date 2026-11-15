@@ -140,7 +140,7 @@ The server claims only text sync, references, definition and rename, and only fo
 - **Whose declarations count:** only story script files and `script` passages feed the root-declaration set and are filtered by it, since they share one concatenated scope. Included scripts are filtered only by their own scope and the project-defined test.
 - **Workspace indexing order:** all `.tw` files, then all `.js` files, then validation.
 - **Revalidation:** every `.js` re-parse revalidates the open `.tw` documents. `.js` documents are never validated.
-- **Removal:** a re-resolve diffs the new file sets against the old ones. A URI that left both sets is removed from the index. A URI whose kind changed is re-parsed. A watcher delete removes the URI directly.
+- **Removal:** a re-resolve diffs the new file sets against the old ones. A URI that left both sets is removed from the index. A URI whose kind changed is re-parsed. A watcher delete removes the URI directly, without a re-resolve.
 
 ### Rename
 
@@ -178,7 +178,7 @@ The server claims only text sync, references, definition and rename, and only fo
   - **Create** re-resolves the sets.
   - **Change to a file that isn't open** re-reads and re-indexes it at full level, and validates `.tw` files.
   - **Change to an open file** is ignored, because sync owns it.
-  - **Delete** removes the file from the index and revalidates. If the file held StoryData, the whole workspace is reindexed.
+  - **Delete** of a file the index holds removes it from the index at once, so no request sees it. The follow-up waits for the create/delete debounce, so a burst or a rename is followed up once: open `.tw` files are revalidated, and the `.js` selector is re-registered if a resolved `.js` file went. If the file held StoryData, the debounce instead reindexes the whole workspace.
   - **Rename** arrives as a delete plus a create.
 - **Retirements:** the client's `workspace/didCreateFiles`, `didDeleteFiles` and `didRenameFiles` notifications, and the client's included-source-file filter, are removed.
 - **Size gate:** a `.js` file over 5 MB (by on-disk size) isn't parsed, indexed or registered. The limit is fixed, with no setting. Each skipped file gets an output-channel line, and there's one warning notification per session. The warning says the file wasn't scanned, that rename and find-references won't see uses in it, and that adding it to `ignores` silences the warning.

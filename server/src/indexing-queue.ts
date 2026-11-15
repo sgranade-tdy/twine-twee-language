@@ -2,7 +2,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 
 import { ProjectFiles, StoryFormat } from "@tt3/shared";
 import { ParseLevel } from "./parser-types";
-import { Index, ScriptFileRole } from "./project-index";
+import { Index, ScriptFileRole, scriptFileRoles } from "./project-index";
 
 /**
  * Everything the indexing queue needs from the outside world.
@@ -12,8 +12,8 @@ export interface IndexingQueueDeps {
     /** Get an open (tracked) document, if there is one. */
     getOpenDocument(uri: string): TextDocument | undefined;
     getAllOpenDocuments(): TextDocument[];
-    /** Read a file via the client. */
-    readFile(uri: string, langId?: string): Promise<TextDocument | undefined>;
+    /** Get a document's contents: the open buffer if there is one, else the file via the client. */
+    readDocument(uri: string): Promise<TextDocument | undefined>;
     /** Ask the client for the project's Twee files, story script files and included scripts. */
     findProjectFiles(): Promise<ProjectFiles>;
     /** Ask the client for files matching a glob. */
@@ -73,10 +73,7 @@ export class IndexingQueue {
      * Start processing the indexing queue.
      */
     start(): void {
-        this.timerId = setInterval(
-            () => void this.run(),
-            interval,
-        );
+        this.timerId = setInterval(() => void this.run(), interval);
     }
 
     /**
@@ -112,10 +109,7 @@ export class IndexingQueue {
      * Run one pass of the indexing queue.
      */
     async run(): Promise<void> {
-        if (
-            this.running ||
-            Date.now() < this.lastTime + minTimeBetween
-        ) {
+        if (this.running || Date.now() < this.lastTime + minTimeBetween) {
             return;
         }
         try {
@@ -126,7 +120,7 @@ export class IndexingQueue {
                 await this.indexAllTweeFiles();
             } else if (this.requestedFileIndexes.size > 0) {
                 for (const uri of this.requestedFileIndexes) {
-                    const doc = await this.getDoc(uri);
+                    const doc = await this.deps.readDocument(uri);
                     if (doc !== undefined) {
                         await this.deps.parseDocument(
                             doc,
@@ -149,21 +143,6 @@ export class IndexingQueue {
     }
 
     /**
-     * Get a document, first from our document store, then (if that fails)
-     * by requesting it from the client.
-     *
-     * @param uri Uri to the document.
-     * @returns The document, or undefined if it's not available.
-     */
-    private async getDoc(uri: string): Promise<TextDocument | undefined> {
-        // If the doc is open and we're tracking it, use that verison, as otherwise
-        // we'll read an old version from disk
-        return (
-            this.deps.getOpenDocument(uri) ?? (await this.deps.readFile(uri))
-        );
-    }
-
-    /**
      * Index all Twee files in an opened project, as reported by the client.
      */
     private async indexAllTweeFiles(): Promise<void> {
@@ -183,8 +162,7 @@ export class IndexingQueue {
             const projectFiles = await deps.findProjectFiles();
             deps.fileSetsResolved(projectFiles);
             const tweeFileUris = new Set(projectFiles.tweeFiles);
-            const storyScriptUris = new Set(projectFiles.storyScriptFiles);
-            const includedScriptUris = new Set(projectFiles.includedScripts);
+            const scriptRoles = scriptFileRoles(projectFiles);
 
             // We'll loop through the files in stages: first to find a StoryData value,
             // and then to validate.
@@ -193,7 +171,7 @@ export class IndexingQueue {
             // potentially hold every file in a project in memory.
             const oldStoryFormat = deps.index.getStoryData()?.storyFormat;
             for (const uri of tweeFileUris) {
-                const doc = await this.getDoc(uri);
+                const doc = await deps.readDocument(uri);
                 if (doc !== undefined) {
                     deps.indexStoryData(doc);
                     // If we get a story format that's different than the old one,
@@ -220,7 +198,7 @@ export class IndexingQueue {
             }
 
             for (const uri of tweeFileUris) {
-                const doc = await this.getDoc(uri);
+                const doc = await deps.readDocument(uri);
                 if (doc !== undefined) {
                     await deps.parseDocument(
                         doc,
@@ -230,21 +208,16 @@ export class IndexingQueue {
                 }
             }
 
-            for (const [uris, role] of [
-                [storyScriptUris, "story-script"],
-                [includedScriptUris, "included-script"],
-            ] as const) {
-                for (const uri of uris) {
-                    const doc = await this.getDoc(uri);
-                    if (doc !== undefined) {
-                        deps.indexScriptFile(doc, role);
-                    }
+            for (const [uri, role] of scriptRoles) {
+                const doc = await deps.readDocument(uri);
+                if (doc !== undefined) {
+                    deps.indexScriptFile(doc, role);
                 }
             }
 
             // Script files are never validated
             for (const uri of tweeFileUris) {
-                const doc = await this.getDoc(uri);
+                const doc = await deps.readDocument(uri);
                 if (doc !== undefined) {
                     await deps.validateDocument(doc);
                 }
@@ -256,10 +229,7 @@ export class IndexingQueue {
             const unprocessedOpenDocuments = deps
                 .getAllOpenDocuments()
                 .filter(
-                    (d) =>
-                        !tweeFileUris.has(d.uri) &&
-                        !storyScriptUris.has(d.uri) &&
-                        !includedScriptUris.has(d.uri),
+                    (d) => !tweeFileUris.has(d.uri) && !scriptRoles.has(d.uri),
                 );
             for (const doc of unprocessedOpenDocuments) {
                 await deps.parseDocument(

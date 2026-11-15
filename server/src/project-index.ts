@@ -5,6 +5,7 @@ import {
     DiagnosticCode,
     DiagnosticMap,
     DisableDiagnosticTag,
+    ProjectFiles,
     StoryFormat,
 } from "@tt3/shared";
 import { EmbeddedDocument } from "./embedded-languages";
@@ -110,6 +111,20 @@ export interface References extends Kind, Callable, Sigiled, Shorthand {
  * built story and have their own scope.
  */
 export type ScriptFileRole = "story-script" | "included-script";
+
+/**
+ * Map each resolved `.js` file to its role. A file in both sets is a story script file only.
+ */
+export function scriptFileRoles(
+    files: ProjectFiles,
+): Map<string, ScriptFileRole> {
+    const roles = new Map<string, ScriptFileRole>();
+    for (const uri of files.storyScriptFiles) roles.set(uri, "story-script");
+    for (const uri of files.includedScripts) {
+        if (!roles.has(uri)) roles.set(uri, "included-script");
+    }
+    return roles;
+}
 
 /**
  * Corresponds to the Twee 3 StoryData passage.
@@ -388,6 +403,12 @@ export interface ProjectIndex {
      * Get all URIs in the index.
      */
     getIndexedUris(): readonly string[];
+
+    /**
+     * Whether the index holds anything from a document, including a script file's role.
+     * @param uri URI of the document.
+     */
+    hasDocument(uri: string): boolean;
 
     /**
      * Remove a document from the project index.
@@ -784,6 +805,10 @@ export class Index implements ProjectIndex {
             ...Object.keys(this._parseErrors),
         ]);
         return [...s];
+    }
+
+    hasDocument(uri: string): boolean {
+        return this.isScriptFile(uri) || this.getIndexedUris().includes(uri);
     }
 
     removeDocument(uri: string): void {

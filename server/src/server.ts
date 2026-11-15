@@ -86,7 +86,7 @@ const indexingQueue = new IndexingQueue({
     index: projectIndex,
     getOpenDocument: (uri) => documents.get(uri),
     getAllOpenDocuments: () => documents.all(),
-    readFile: (uri) => fetchFile(uri),
+    readDocument: (uri) => readDocument(uri),
     findProjectFiles: () => connection.sendRequest(FindProjectFilesRequest),
     findFiles: (glob) => connection.sendRequest(FindFilesRequest, glob),
     indexStoryData: (doc) =>
@@ -121,7 +121,7 @@ const fileTracker = new WorkspaceFileTracker({
     onMacroChanges: () => onSCMacroChanges(),
     indexScriptFile: (doc, role) =>
         updateScriptFileIndex(doc, role, ParseLevel.Full, projectIndex),
-    readScript: async (uri) => documents.get(uri) ?? (await fetchFile(uri)),
+    readDocument: (uri) => readDocument(uri),
     scriptFilesChanged: (uris) => void scriptRegistrar?.update(uris),
     revalidateOpenTweeDocuments: () => revalidateOpenTweeDocuments(),
     logError: (message) => connection.console.error(message),
@@ -408,6 +408,17 @@ connection.onRequest("textDocument/semanticTokens/full", (params) => {
 connection.onShutdown(() => {
     indexingQueue.stop();
 });
+
+/**
+ * Get a document's contents: the open buffer if there is one, since the file
+ * on disk may be older, else the file from the client.
+ *
+ * @param uri URI of the document.
+ * @returns The document, or undefined if it's not available.
+ */
+async function readDocument(uri: string): Promise<TextDocument | undefined> {
+    return documents.get(uri) ?? (await fetchFile(uri));
+}
 
 /**
  * Fetch a file from the client.

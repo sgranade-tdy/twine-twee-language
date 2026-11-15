@@ -14,7 +14,7 @@ import { generateDiagnostics } from "../validator";
 import {
     WorkspaceFileTracker,
     WorkspaceFileTrackerDeps,
-    fileSetResolveDebounceMs,
+    fileEventDebounceMs,
     scriptReparseDebounceMs,
 } from "../workspace-file-tracker";
 
@@ -51,7 +51,7 @@ function build(
         onMacroChanges: () => void calls.push("macroChanges"),
         logError: (message) => void calls.push(`error:${message}`),
         indexScriptFile: (doc) => void calls.push(`script:${doc.uri}`),
-        readScript: async (uri) => twee(uri, ""),
+        readDocument: async (uri) => twee(uri, ""),
         scriptFilesChanged: (uris) => void calls.push(`files:${uris}`),
         revalidateOpenTweeDocuments: async () => void calls.push("revalidate"),
         ...overrides,
@@ -90,7 +90,9 @@ function harness(
     );
     const index = new Index();
     const diagnostics = new Map<string, Diagnostic[]>();
-    const counts = { resolves: 0, workspaceIndexes: 0 };
+    const counts = { resolves: 0, workspaceIndexes: 0, revalidations: 0 };
+    /** Missing-passage diagnostics across open documents after each revalidation. */
+    const missingPassageHistory: number[] = [];
     const errors: string[] = [];
     const exists = (uris: string[]) => uris.filter((u) => files.has(u));
     const resolve =
@@ -108,17 +110,28 @@ function harness(
         void diagnostics.set(doc.uri, await generateDiagnostics(doc, index));
     const revalidateOpenTweeDocuments = async () => {
         for (const doc of openDocs.values()) await validate(doc);
+        counts.revalidations++;
+        missingPassageHistory.push(
+            [...openDocs.keys()].reduce(
+                (n, uri) => n + missingPassages(uri),
+                0,
+            ),
+        );
     };
     const noop = () => {};
+    const readDocument = async (uri: string) => {
+        const text = files.get(uri);
+        return (
+            openDocs.get(uri) ??
+            (text === undefined ? undefined : twee(uri, text))
+        );
+    };
     let tracker: WorkspaceFileTracker;
     const queue = new IndexingQueue({
         index,
         getOpenDocument: (uri) => openDocs.get(uri),
         getAllOpenDocuments: () => [...openDocs.values()],
-        readFile: async (uri) => {
-            const text = files.get(uri);
-            return text === undefined ? undefined : twee(uri, text);
-        },
+        readDocument,
         findProjectFiles: countedResolve,
         findFiles: async () => [],
         indexStoryData: (doc) =>
@@ -149,13 +162,7 @@ function harness(
         logError: (message) => void errors.push(message),
         indexScriptFile: (doc, role) =>
             updateScriptFileIndex(doc, role, ParseLevel.Full, index),
-        readScript: async (uri) => {
-            const text = files.get(uri);
-            return (
-                openDocs.get(uri) ??
-                (text === undefined ? undefined : twee(uri, text))
-            );
-        },
+        readDocument,
         scriptFilesChanged: (uris) => void registrations.push(uris),
         revalidateOpenTweeDocuments,
     });
@@ -173,6 +180,8 @@ function harness(
         await revalidateOpenTweeDocuments();
         counts.resolves = 0;
         counts.workspaceIndexes = 0;
+        counts.revalidations = 0;
+        missingPassageHistory.length = 0;
     };
     const neverSet = (uri: string) =>
         (diagnostics.get(uri) ?? []).filter(
@@ -192,6 +201,7 @@ function harness(
         drain,
         start,
         missingPassages,
+        missingPassageHistory,
         neverSet,
         revalidateOpenTweeDocuments,
         scripts,
@@ -293,9 +303,10 @@ describe("Workspace file tracker", () => {
             await h.tracker.handleWatchedFileChanges([
                 { uri: otherUri, kind: "deleted" },
             ]);
+            expect(h.index.getIndexedUris()).to.eql([storyUri]);
+            await fakeClock.tickAsync(fileEventDebounceMs);
             await h.drain();
 
-            expect(h.index.getIndexedUris()).to.eql([storyUri]);
             expect(h.missingPassages(storyUri)).to.eql(1);
             expect(h.counts.workspaceIndexes).to.eql(0);
         });
@@ -309,6 +320,7 @@ describe("Workspace file tracker", () => {
             await h.tracker.handleWatchedFileChanges([
                 { uri: storyUri, kind: "deleted" },
             ]);
+            await fakeClock.tickAsync(fileEventDebounceMs);
             await h.drain();
 
             expect(h.counts.workspaceIndexes).to.eql(1);
@@ -326,10 +338,11 @@ describe("Workspace file tracker", () => {
                 { uri: storyUri, kind: "deleted" },
                 { uri: movedUri, kind: "created" },
             ]);
-            await fakeClock.tickAsync(fileSetResolveDebounceMs);
+            await fakeClock.tickAsync(fileEventDebounceMs);
             await h.drain();
 
             expect(h.counts.workspaceIndexes).to.eql(1);
+            expect(h.counts.resolves).to.eql(1);
             expect(h.index.getStoryDataUri()).to.eql(movedUri);
             expect(h.index.getIndexedUris()).not.to.include(storyUri);
         });
@@ -348,7 +361,7 @@ describe("Workspace file tracker", () => {
                 { uri: otherUri, kind: "deleted" },
                 { uri: renamedUri, kind: "created" },
             ]);
-            await fakeClock.tickAsync(fileSetResolveDebounceMs);
+            await fakeClock.tickAsync(fileEventDebounceMs);
             await h.drain();
 
             expect(h.index.getIndexedUris()).to.have.members([
@@ -356,6 +369,55 @@ describe("Workspace file tracker", () => {
                 renamedUri,
             ]);
             expect(h.missingPassages(storyUri)).to.eql(0);
+        });
+
+        it("should not show missing-passage diagnostics partway through a rename", async () => {
+            const renamedUri = "file:///renamed.tw";
+            const h = harness(
+                { [storyUri]: storyText, [otherUri]: nextText },
+                { open: { [storyUri]: storyText } },
+            );
+            await h.start();
+
+            h.files.delete(otherUri);
+            h.files.set(renamedUri, nextText);
+            await h.tracker.handleWatchedFileChanges([
+                { uri: otherUri, kind: "deleted" },
+                { uri: renamedUri, kind: "created" },
+            ]);
+            await fakeClock.tickAsync(fileEventDebounceMs);
+            await h.drain();
+
+            expect(h.missingPassageHistory).to.not.be.empty;
+            expect(h.missingPassageHistory).to.not.include(1);
+        });
+
+        it("should revalidate once for a burst of Twee deletes", async () => {
+            const thirdUri = "file:///third.tw";
+            const h = harness(
+                {
+                    [storyUri]: storyText,
+                    [otherUri]: nextText,
+                    [thirdUri]: ":: Third\n",
+                },
+                { open: { [storyUri]: storyText } },
+            );
+            await h.start();
+
+            h.files.delete(otherUri);
+            h.files.delete(thirdUri);
+            await h.tracker.handleWatchedFileChanges([
+                { uri: otherUri, kind: "deleted" },
+            ]);
+            await h.tracker.handleWatchedFileChanges([
+                { uri: thirdUri, kind: "deleted" },
+            ]);
+            await fakeClock.tickAsync(fileEventDebounceMs);
+            await h.drain();
+
+            expect(h.index.getIndexedUris()).to.eql([storyUri]);
+            expect(h.counts.revalidations).to.eql(1);
+            expect(h.counts.resolves).to.eql(0);
         });
 
         it("should coalesce a burst of creates into one re-resolve after the debounce", async () => {
@@ -368,7 +430,7 @@ describe("Workspace file tracker", () => {
                 await h.tracker.handleWatchedFileChanges([
                     { uri, kind: "created" },
                 ]);
-                await fakeClock.tickAsync(fileSetResolveDebounceMs - 1);
+                await fakeClock.tickAsync(fileEventDebounceMs - 1);
             }
             expect(h.counts.resolves).to.eql(0);
             await fakeClock.tickAsync(1);
@@ -390,7 +452,7 @@ describe("Workspace file tracker", () => {
             await h.tracker.handleWatchedFileChanges([
                 { uri: "file:///stray.txt", kind: "created" },
             ]);
-            await fakeClock.tickAsync(fileSetResolveDebounceMs);
+            await fakeClock.tickAsync(fileEventDebounceMs);
             await h.drain();
 
             expect(h.index.getIndexedUris()).to.eql([storyUri]);
@@ -422,13 +484,13 @@ describe("Workspace file tracker", () => {
             await h.tracker.handleWatchedFileChanges([
                 { uri: "file:///a.tw", kind: "created" },
             ]);
-            await fakeClock.tickAsync(fileSetResolveDebounceMs);
+            await fakeClock.tickAsync(fileEventDebounceMs);
             gate = undefined;
             h.files.set("file:///b.tw", ":: B\n");
             await h.tracker.handleWatchedFileChanges([
                 { uri: "file:///b.tw", kind: "created" },
             ]);
-            await fakeClock.tickAsync(fileSetResolveDebounceMs);
+            await fakeClock.tickAsync(fileEventDebounceMs);
             release();
             await fakeClock.tickAsync(0);
             await h.drain();
@@ -514,7 +576,7 @@ describe("Workspace file tracker", () => {
             await h.tracker.handleWatchedFileChanges([
                 { uri: scriptUri, kind: "created" },
             ]);
-            await fakeClock.tickAsync(fileSetResolveDebounceMs);
+            await fakeClock.tickAsync(fileEventDebounceMs);
 
             expect(h.index.getScriptFileRole(scriptUri)).to.eql("story-script");
             expect(h.registrations).to.eql([[scriptUri]]);
@@ -529,9 +591,63 @@ describe("Workspace file tracker", () => {
             await h.tracker.handleWatchedFileChanges([
                 { uri: scriptUri, kind: "deleted" },
             ]);
-            await fakeClock.tickAsync(fileSetResolveDebounceMs);
+            await fakeClock.tickAsync(fileEventDebounceMs);
 
             expect(h.index.isScriptFile(scriptUri)).to.be.false;
+            expect(h.registrations).to.eql([[]]);
+            expect(h.neverSet(storyUri)).to.eql(1);
+        });
+
+        it("should drop a deleted .js file's occurrences before the debounce fires", async () => {
+            const h = await startWithScript();
+
+            h.files.delete(scriptUri);
+            await h.tracker.handleWatchedFileChanges([
+                { uri: scriptUri, kind: "deleted" },
+            ]);
+            const tw = h.openDocs.get(storyUri)!;
+            const edit = generateRenames(
+                storyUri,
+                tw.positionAt(tw.getText().indexOf("gold")),
+                "silver",
+                h.index,
+            ) as { changes: Record<string, unknown[]> };
+
+            expect(edit.changes[scriptUri]).to.be.undefined;
+            expect(h.registrations).to.eql([]);
+        });
+
+        it("should still update the selector for a deleted .js file if re-resolving fails", async () => {
+            let fail = false;
+            const files: { tw: string[]; story: string[] } = {
+                tw: [storyUri],
+                story: [scriptUri],
+            };
+            const h = harness(
+                { [storyUri]: goldStoryText, [scriptUri]: setsGold },
+                {
+                    open: { [storyUri]: goldStoryText },
+                    findProjectFiles: async () => {
+                        if (fail) throw new Error("boom");
+                        return {
+                            tweeFiles: files.tw,
+                            storyScriptFiles: files.story,
+                            includedScripts: [],
+                        };
+                    },
+                },
+            );
+            await h.start();
+            fail = true;
+
+            h.files.delete(scriptUri);
+            await h.tracker.handleWatchedFileChanges([
+                { uri: scriptUri, kind: "deleted" },
+                { uri: "file:///new.tw", kind: "created" },
+            ]);
+            await fakeClock.tickAsync(fileEventDebounceMs);
+
+            expect(h.errors).to.have.length(1);
             expect(h.registrations).to.eql([[]]);
             expect(h.neverSet(storyUri)).to.eql(1);
         });
@@ -559,7 +675,7 @@ describe("Workspace file tracker", () => {
             await h.tracker.handleWatchedFileChanges([
                 { uri: "file:///other.js", kind: "created" },
             ]);
-            await fakeClock.tickAsync(fileSetResolveDebounceMs);
+            await fakeClock.tickAsync(fileEventDebounceMs);
 
             expect(h.index.getScriptFileRole(scriptUri)).to.eql("story-script");
             expect(h.registrations).to.eql([]);
@@ -573,7 +689,7 @@ describe("Workspace file tracker", () => {
                     { uri: `file:///${name}.js`, kind: "created" },
                 ]);
             }
-            await fakeClock.tickAsync(fileSetResolveDebounceMs);
+            await fakeClock.tickAsync(fileEventDebounceMs);
 
             expect(h.counts.resolves).to.eql(1);
         });
@@ -587,7 +703,7 @@ describe("Workspace file tracker", () => {
                 { uri: vendorUri, kind: "created" },
                 { uri: vendorUri, kind: "changed" },
             ]);
-            await fakeClock.tickAsync(fileSetResolveDebounceMs);
+            await fakeClock.tickAsync(fileEventDebounceMs);
 
             expect(h.index.isScriptFile(vendorUri)).to.be.false;
             expect(h.registrations).to.eql([]);
@@ -618,9 +734,16 @@ describe("Workspace file tracker", () => {
 
     describe("open .js buffers", () => {
         const doc = TextDocument.create("file:///a.js", "javascript", 1, "x");
+        /** Resolve the buffer's file as a story script file. */
+        const resolveAsStoryScript = (tracker: WorkspaceFileTracker) =>
+            tracker.setFileSets({
+                tweeFiles: [storyUri],
+                storyScriptFiles: [doc.uri],
+                includedScripts: [],
+            });
         it("should coalesce a burst of edits into one re-parse after the debounce", () => {
-            const { tracker, calls, index } = build();
-            index.setScriptFileRole(doc.uri, "story-script");
+            const { tracker, calls } = build();
+            resolveAsStoryScript(tracker);
 
             tracker.handleScriptBufferChanged(doc);
             fakeClock.tick(scriptReparseDebounceMs - 1);
@@ -635,8 +758,8 @@ describe("Workspace file tracker", () => {
         });
 
         it("should flush pending parses synchronously", () => {
-            const { tracker, calls, index } = build();
-            index.setScriptFileRole(doc.uri, "story-script");
+            const { tracker, calls } = build();
+            resolveAsStoryScript(tracker);
 
             tracker.handleScriptBufferChanged(doc);
             tracker.flushPendingScripts();
@@ -660,6 +783,7 @@ describe("Workspace file tracker", () => {
                 indexScriptFile: (d, role) =>
                     updateScriptFileIndex(d, role, ParseLevel.Full, index),
             });
+            resolveAsStoryScript(tracker);
             const tw = TextDocument.create(
                 "file:///story.tw",
                 "twee3",

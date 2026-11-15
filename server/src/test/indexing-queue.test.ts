@@ -16,7 +16,7 @@ function build(overrides: Partial<IndexingQueueDeps> = {}) {
         index,
         getOpenDocument: () => undefined,
         getAllOpenDocuments: () => [],
-        readFile: async (uri) => doc(uri),
+        readDocument: async (uri) => doc(uri),
         findProjectFiles: async () => ({
             tweeFiles: ["file:///a.tw", "file:///b.tw"],
             storyScriptFiles: [],
@@ -165,20 +165,5 @@ describe("Indexing queue", () => {
 
         expect(afterFirst).to.eql(3);
         expect(calls.length).to.eql(6);
-    });
-
-    it("should prefer an open document over reading the file", async () => {
-        const open = TextDocument.create("file:///c.tw", "twee3", 7, "open");
-        const { queue, calls } = build({
-            getOpenDocument: (uri) => (uri === open.uri ? open : undefined),
-            readFile: async () => {
-                throw new Error("should not read");
-            },
-        });
-
-        queue.indexFile(open.uri);
-        await queue.run();
-
-        expect(calls).to.include("parse:file:///c.tw:true");
     });
 });

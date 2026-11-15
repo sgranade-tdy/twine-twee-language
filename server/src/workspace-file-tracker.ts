@@ -2,22 +2,19 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 
 import { ProjectFiles } from "@tt3/shared";
 import { IndexingQueue } from "./indexing-queue";
-import { Index, ScriptFileRole } from "./project-index";
+import { Index, ScriptFileRole, scriptFileRoles } from "./project-index";
 
 /** How long to wait after the last `.js` edit before re-parsing. */
 export const scriptReparseDebounceMs = 300;
 
-/** How long to wait after the last create or delete event before re-resolving the file sets. */
-export const fileSetResolveDebounceMs = 300;
+/** How long to wait after the last create or delete event before acting on them. */
+export const fileEventDebounceMs = 300;
 
 /**
  * Everything the tracker needs from the outside world.
  */
 export interface WorkspaceFileTrackerDeps {
-    index: Pick<
-        Index,
-        "removeDocument" | "getScriptFileRole" | "getStoryDataUri"
-    >;
+    index: Pick<Index, "hasDocument" | "removeDocument" | "getStoryDataUri">;
     queue: Pick<IndexingQueue, "indexFile" | "indexWorkspace">;
     /** Ask the client for the project's resolved file sets. */
     findProjectFiles(): Promise<ProjectFiles>;
@@ -28,8 +25,8 @@ export interface WorkspaceFileTrackerDeps {
     logError(message: string): void;
     /** Re-index an open `.js` buffer. */
     indexScriptFile(document: TextDocument, role: ScriptFileRole): void;
-    /** Get a `.js` file's contents: the open buffer if there is one, else the file on disk. */
-    readScript(uri: string): Promise<TextDocument | undefined>;
+    /** Get a document's contents: the open buffer if there is one, else the file on disk. */
+    readDocument(uri: string): Promise<TextDocument | undefined>;
     /** The set of resolved `.js` files changed, so features should be re-registered. */
     scriptFilesChanged(uris: string[]): void;
     /** Re-validate every open Twee document. */
@@ -45,6 +42,22 @@ export interface WatchedFileChange {
 }
 
 /**
+ * Follow-up work owed for deletes since the last file-event flush.
+ */
+interface PendingDeletes {
+    /** A deleted file held StoryData, so the whole workspace must be reindexed. */
+    storyData: boolean;
+    /** A deleted file was a resolved `.js` file, so features must be re-registered. */
+    scriptFiles: boolean;
+    /** Something was removed from the index, so open Twee documents must be revalidated. */
+    any: boolean;
+}
+
+function noPendingDeletes(): PendingDeletes {
+    return { storyData: false, scriptFiles: false, any: false };
+}
+
+/**
  * Handles watched-file events and open-buffer edits.
  */
 export class WorkspaceFileTracker {
@@ -52,8 +65,9 @@ export class WorkspaceFileTracker {
     private tweeFiles: Set<string> | undefined;
     private scriptRoles: Map<string, ScriptFileRole> | undefined;
     private scriptTimer: ReturnType<typeof setTimeout> | undefined;
-    private pendingResolves = new Set<string>();
-    private resolveTimer: ReturnType<typeof setTimeout> | undefined;
+    private pendingCreates = new Set<string>();
+    private pendingDeletes = noPendingDeletes();
+    private fileEventTimer: ReturnType<typeof setTimeout> | undefined;
     /** Resolves run one at a time, so a slow one can't overwrite a newer result. */
     private resolveChain: Promise<unknown> = Promise.resolve();
 
@@ -81,7 +95,7 @@ export class WorkspaceFileTracker {
         const pending = [...this.pendingScripts.values()];
         this.pendingScripts.clear();
         for (const doc of pending) {
-            const role = this.deps.index.getScriptFileRole(doc.uri);
+            const role = this.scriptRoles?.get(doc.uri);
             if (role !== undefined) {
                 this.deps.indexScriptFile(doc, role);
             }
@@ -94,12 +108,7 @@ export class WorkspaceFileTracker {
      */
     setFileSets(files: ProjectFiles): void {
         this.tweeFiles = new Set(files.tweeFiles);
-        this.scriptRoles = new Map<string, ScriptFileRole>([
-            ...files.includedScripts.map(
-                (u) => [u, "included-script"] as const,
-            ),
-            ...files.storyScriptFiles.map((u) => [u, "story-script"] as const),
-        ]);
+        this.scriptRoles = scriptFileRoles(files);
     }
 
     /**
@@ -115,11 +124,12 @@ export class WorkspaceFileTracker {
                 void this.deps.parseMacroFile(change.uri);
                 this.deps.onMacroChanges();
             } else if (change.kind === "created") {
-                this.scheduleResolve(change.uri);
+                this.pendingCreates.add(change.uri);
+                this.scheduleFileEventFlush();
+            } else if (change.kind === "deleted") {
+                this.handleDeleted(change.uri);
             } else if (change.uri.endsWith(".js")) {
-                // A deleted script is dropped by the re-resolve's diff; a rename arrives as delete + create
-                if (change.kind === "deleted") this.scheduleResolve(change.uri);
-                else scriptChanges.push(change);
+                scriptChanges.push(change);
             } else {
                 tweeChanges.push(change);
             }
@@ -133,13 +143,29 @@ export class WorkspaceFileTracker {
                 .filter((uri) => !this.deps.isOpen(uri)),
         );
         for (const change of tweeChanges) {
-            if (!this.isTrackedTweeFile(change.uri)) continue;
-            if (change.kind === "deleted") {
-                await this.handleTweeDeleted(change.uri);
-            } else if (!this.deps.isOpen(change.uri)) {
+            if (
+                this.isTrackedTweeFile(change.uri) &&
+                !this.deps.isOpen(change.uri)
+            ) {
                 this.deps.queue.indexFile(change.uri);
             }
         }
+    }
+
+    /**
+     * Remove a deleted file from the index at once, so requests never see it,
+     * and defer the follow-up work to the file-event flush.
+     * A rename arrives as delete + create, so both land in the same flush.
+     */
+    private handleDeleted(uri: string): void {
+        if (!this.deps.index.hasDocument(uri)) return;
+        const pending = this.pendingDeletes;
+        if (this.deps.index.getStoryDataUri() === uri) pending.storyData = true;
+        if (this.scriptRoles?.delete(uri)) pending.scriptFiles = true;
+        this.tweeFiles?.delete(uri);
+        this.deps.index.removeDocument(uri);
+        pending.any = true;
+        this.scheduleFileEventFlush();
     }
 
     /**
@@ -159,73 +185,110 @@ export class WorkspaceFileTracker {
      * Files outside the resolved sets are ignored.
      */
     private async reindexScriptsFromDisk(uris: string[]): Promise<void> {
-        let reindexed = false;
+        const resolved: [string, ScriptFileRole][] = [];
         for (const uri of uris) {
             const role = this.scriptRoles?.get(uri);
-            if (role === undefined) continue;
-            const doc = await this.deps.readScript(uri);
+            if (role !== undefined) resolved.push([uri, role]);
+        }
+        if (await this.reindexScripts(resolved)) {
+            await this.deps.revalidateOpenTweeDocuments();
+        }
+    }
+
+    /**
+     * Read and re-index `.js` files with the given roles.
+     *
+     * @returns Whether any file was re-indexed.
+     */
+    private async reindexScripts(
+        scripts: Iterable<[string, ScriptFileRole]>,
+    ): Promise<boolean> {
+        let reindexed = false;
+        for (const [uri, role] of scripts) {
+            const doc = await this.deps.readDocument(uri);
             if (doc === undefined) continue;
             this.deps.indexScriptFile(doc, role);
             reindexed = true;
         }
-        if (reindexed) await this.deps.revalidateOpenTweeDocuments();
+        return reindexed;
     }
 
     /**
-     * Bring the index and `.js` registration in step with a changed script file set.
+     * Bring the index in step with a changed script file set.
      *
      * @param previous The script files and roles before the change.
+     * @returns Whether the set's membership changed, and whether the index changed.
      */
     private async applyScriptSetChange(
         previous: Map<string, ScriptFileRole>,
-    ): Promise<void> {
-        const current = this.scriptRoles ?? new Map();
-        let membershipChanged = false;
-        let reindexed = false;
-        for (const uri of previous.keys()) {
-            if (!current.has(uri)) {
-                this.deps.index.removeDocument(uri);
-                membershipChanged = true;
-                reindexed = true;
-            }
-        }
-        for (const [uri, role] of current) {
-            const oldRole = previous.get(uri);
-            if (oldRole === role) continue;
-            if (oldRole === undefined) membershipChanged = true;
-            const doc = await this.deps.readScript(uri);
-            if (doc !== undefined) {
-                this.deps.indexScriptFile(doc, role);
-                reindexed = true;
-            }
-        }
-        if (membershipChanged)
-            this.deps.scriptFilesChanged([...current.keys()]);
-        if (reindexed) await this.deps.revalidateOpenTweeDocuments();
+    ): Promise<{ membershipChanged: boolean; indexChanged: boolean }> {
+        const current = this.scriptRoles ?? new Map<string, ScriptFileRole>();
+        const removed = [...previous.keys()].filter((uri) => !current.has(uri));
+        const changed = [...current].filter(
+            ([uri, role]) => previous.get(uri) !== role,
+        );
+        for (const uri of removed) this.deps.index.removeDocument(uri);
+        const reindexed = await this.reindexScripts(changed);
+        return {
+            membershipChanged:
+                removed.length > 0 ||
+                changed.some(([uri]) => !previous.has(uri)),
+            indexChanged: removed.length > 0 || reindexed,
+        };
     }
 
-    /**
-     * Note a created or deleted file; the file sets are re-resolved after a debounce.
-     */
-    private scheduleResolve(uri: string): void {
-        this.pendingResolves.add(uri);
-        clearTimeout(this.resolveTimer);
-        this.resolveTimer = setTimeout(
-            () => void this.flushPendingResolves(),
-            fileSetResolveDebounceMs,
+    private scheduleFileEventFlush(): void {
+        clearTimeout(this.fileEventTimer);
+        this.fileEventTimer = setTimeout(
+            () => void this.flushFileEvents(),
+            fileEventDebounceMs,
         );
     }
 
-    private async flushPendingResolves(): Promise<void> {
-        this.resolveTimer = undefined;
-        const pending = [...this.pendingResolves];
-        this.pendingResolves.clear();
-        if (!(await this.resolveFileSets())) return;
-        for (const uri of pending) {
-            if (this.isTrackedTweeFile(uri)) {
-                this.deps.queue.indexFile(uri);
-            }
+    /**
+     * Act on the creates and deletes since the last flush: re-resolve the file
+     * sets if anything was created, then re-register and revalidate once.
+     */
+    private flushFileEvents(): Promise<void> {
+        this.fileEventTimer = undefined;
+        const created = [...this.pendingCreates];
+        this.pendingCreates.clear();
+        const deletes = this.pendingDeletes;
+        this.pendingDeletes = noPendingDeletes();
+        if (deletes.storyData) {
+            // A workspace index re-resolves, re-registers and revalidates everything
+            this.deps.queue.indexWorkspace();
+            return Promise.resolve();
         }
+        return this.serialize(async () => {
+            let reregister = deletes.scriptFiles;
+            let revalidate = deletes.any;
+            let tweeQueued = false;
+            const previous = this.scriptRoles;
+            if (created.length > 0 && (await this.fetchFileSets())) {
+                if (previous !== undefined) {
+                    const change = await this.applyScriptSetChange(previous);
+                    reregister ||= change.membershipChanged;
+                    revalidate ||= change.indexChanged;
+                }
+                for (const uri of created) {
+                    if (this.isTrackedTweeFile(uri)) {
+                        this.deps.queue.indexFile(uri);
+                        tweeQueued = true;
+                    }
+                }
+            }
+            if (reregister) {
+                this.deps.scriptFilesChanged([
+                    ...(this.scriptRoles?.keys() ?? []),
+                ]);
+            }
+            // The queue revalidates after indexing, so revalidating now would
+            // briefly show diagnostics from a half-applied rename
+            if (revalidate && !tweeQueued) {
+                await this.deps.revalidateOpenTweeDocuments();
+            }
+        });
     }
 
     /**
@@ -244,37 +307,32 @@ export class WorkspaceFileTracker {
     }
 
     /**
-     * Ask the client for the file sets. On failure, log and drop the event:
-     * a reindex would make the same failing request.
+     * Ask the client for the file sets, after any resolve already running.
      */
     private resolveFileSets(): Promise<boolean> {
-        const result = this.resolveChain.then(async () => {
-            try {
-                const previous = this.scriptRoles;
-                this.setFileSets(await this.deps.findProjectFiles());
-                if (previous !== undefined) {
-                    await this.applyScriptSetChange(previous);
-                }
-                return true;
-            } catch (err) {
-                this.deps.logError(
-                    `Couldn't resolve the project's files: ${err}`,
-                );
-                return false;
-            }
-        });
-        this.resolveChain = result;
+        return this.serialize(() => this.fetchFileSets());
+    }
+
+    /**
+     * Run a task after every earlier one, so a slow resolve can't overwrite a newer result.
+     */
+    private serialize<T>(task: () => Promise<T>): Promise<T> {
+        const result = this.resolveChain.then(task);
+        this.resolveChain = result.catch(() => undefined);
         return result;
     }
 
-    private async handleTweeDeleted(uri: string): Promise<void> {
-        this.tweeFiles?.delete(uri);
-        const heldStoryData = this.deps.index.getStoryDataUri() === uri;
-        this.deps.index.removeDocument(uri);
-        if (heldStoryData) {
-            this.deps.queue.indexWorkspace();
-        } else {
-            await this.deps.revalidateOpenTweeDocuments();
+    /**
+     * Ask the client for the file sets. On failure, log and return false:
+     * a reindex would make the same failing request.
+     */
+    private async fetchFileSets(): Promise<boolean> {
+        try {
+            this.setFileSets(await this.deps.findProjectFiles());
+            return true;
+        } catch (err) {
+            this.deps.logError(`Couldn't resolve the project's files: ${err}`);
+            return false;
         }
     }
 }
