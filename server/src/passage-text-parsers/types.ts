@@ -51,6 +51,11 @@ export interface ParsingState {
      * Callbacks for parsing events
      */
     callbacks: ParserCallbacks;
+    /**
+     * True if the text being parsed is an entire local `.js` file rather than
+     * a passage.
+     */
+    isScriptFile?: boolean;
 }
 
 /**
