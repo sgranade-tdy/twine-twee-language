@@ -83,12 +83,6 @@ let hasDocumentChangesCapability = false;
 let scriptRegistrar: ScriptFeatureRegistrar | undefined;
 
 const indexingQueue = new IndexingQueue({
-    clock: {
-        now: () => Date.now(),
-        setInterval: (cb, ms) => setInterval(cb, ms),
-        clearInterval: (handle) =>
-            clearInterval(handle as ReturnType<typeof setInterval>),
-    },
     index: projectIndex,
     getOpenDocument: (uri) => documents.get(uri),
     getAllOpenDocuments: () => documents.all(),
@@ -127,6 +121,8 @@ const fileTracker = new WorkspaceFileTracker({
     onMacroChanges: () => onSCMacroChanges(),
     indexScriptFile: (doc, role) =>
         updateScriptFileIndex(doc, role, ParseLevel.Full, projectIndex),
+    readScript: async (uri) => documents.get(uri) ?? (await fetchFile(uri)),
+    scriptFilesChanged: (uris) => void scriptRegistrar?.update(uris),
     revalidateOpenTweeDocuments: () => revalidateOpenTweeDocuments(),
     logError: (message) => connection.console.error(message),
 });

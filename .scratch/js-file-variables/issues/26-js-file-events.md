@@ -16,15 +16,15 @@
 
 **Blocked by:** 23, 25
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Creating a matched `.js` file indexes it and adds it to the selector
-- [ ] Deleting or renaming one removes its occurrences and updates the selector
-- [ ] A closed `.js` file changed on disk is re-indexed, and `variable-never-set` in open `.tw` files updates
-- [ ] A file that moves from included script to story script file is re-parsed with the new kind
-- [ ] A burst of create events causes one re-resolve
-- [ ] `.js` files outside the resolved sets are ignored
-- [ ] Closing an edited, unsaved `.js` buffer restores the on-disk contents in the index, and `variable-never-set` in open `.tw` files updates
+- [x] Creating a matched `.js` file indexes it and adds it to the selector
+- [x] Deleting or renaming one removes its occurrences and updates the selector
+- [x] A closed `.js` file changed on disk is re-indexed, and `variable-never-set` in open `.tw` files updates
+- [x] A file that moves from included script to story script file is re-parsed with the new kind
+- [x] A burst of create events causes one re-resolve
+- [x] `.js` files outside the resolved sets are ignored
+- [x] Closing an edited, unsaved `.js` buffer restores the on-disk contents in the index, and `variable-never-set` in open `.tw` files updates
 
 ## Comments
 

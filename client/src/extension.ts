@@ -537,6 +537,7 @@ export function startClient(context: vscode.ExtensionContext) {
                     "**/*.twee-config.{json,yaml,yml}",
                 ),
                 vscode.workspace.createFileSystemWatcher("**/*.{tw,twee}"),
+                vscode.workspace.createFileSystemWatcher("**/*.js"),
             ],
         },
         middleware: {

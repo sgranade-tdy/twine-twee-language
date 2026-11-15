@@ -5,19 +5,9 @@ import { ParseLevel } from "./parser-types";
 import { Index, ScriptFileRole } from "./project-index";
 
 /**
- * Timer functions the indexing queue uses, injectable so tests can fake time.
- */
-export interface Clock {
-    now(): number;
-    setInterval(callback: () => void, ms: number): unknown;
-    clearInterval(handle: unknown): void;
-}
-
-/**
  * Everything the indexing queue needs from the outside world.
  */
 export interface IndexingQueueDeps {
-    clock: Clock;
     index: Pick<Index, "getIndexedUris" | "removeDocument" | "getStoryData">;
     /** Get an open (tracked) document, if there is one. */
     getOpenDocument(uri: string): TextDocument | undefined;
@@ -70,7 +60,7 @@ function storyFormatsDiffer(
  */
 export class IndexingQueue {
     private lastTime = -1; // Last time the queue ran, in ms since epoch
-    private timerId: unknown;
+    private timerId: ReturnType<typeof setInterval> | undefined;
     private running = false;
 
     private requestedFileIndexes: Set<string> = new Set(); // Files to index
@@ -83,7 +73,7 @@ export class IndexingQueue {
      * Start processing the indexing queue.
      */
     start(): void {
-        this.timerId = this.deps.clock.setInterval(
+        this.timerId = setInterval(
             () => void this.run(),
             interval,
         );
@@ -93,7 +83,7 @@ export class IndexingQueue {
      * Stop processing the indexing queue.
      */
     stop(): void {
-        this.deps.clock.clearInterval(this.timerId);
+        clearInterval(this.timerId);
     }
 
     /**
@@ -124,7 +114,7 @@ export class IndexingQueue {
     async run(): Promise<void> {
         if (
             this.running ||
-            this.deps.clock.now() < this.lastTime + minTimeBetween
+            Date.now() < this.lastTime + minTimeBetween
         ) {
             return;
         }
@@ -153,7 +143,7 @@ export class IndexingQueue {
                 await this.indexT3LTMacroFiles();
             }
         } finally {
-            this.lastTime = this.deps.clock.now();
+            this.lastTime = Date.now();
             this.running = false;
         }
     }

@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import * as sinon from "sinon";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
 import { Index } from "../project-index";
@@ -10,14 +11,8 @@ function doc(uri: string): TextDocument {
 
 function build(overrides: Partial<IndexingQueueDeps> = {}) {
     const calls: string[] = [];
-    let time = 1000;
     const index = new Index();
     const deps: IndexingQueueDeps = {
-        clock: {
-            now: () => time,
-            setInterval: () => 1,
-            clearInterval: () => {},
-        },
         index,
         getOpenDocument: () => undefined,
         getAllOpenDocuments: () => [],
@@ -50,11 +45,20 @@ function build(overrides: Partial<IndexingQueueDeps> = {}) {
         queue: new IndexingQueue(deps),
         calls,
         index,
-        advance: (ms: number) => (time += ms),
     };
 }
 
 describe("Indexing queue", () => {
+    let clock: sinon.SinonFakeTimers;
+
+    beforeEach(() => {
+        clock = sinon.useFakeTimers({ now: 1000 });
+    });
+
+    afterEach(() => {
+        clock.restore();
+    });
+
     it("should index every Twee file in stages when the workspace is requested", async () => {
         const { queue, calls } = build();
 
@@ -149,14 +153,14 @@ describe("Indexing queue", () => {
     });
 
     it("should wait the minimum time between runs", async () => {
-        const { queue, calls, advance } = build();
+        const { queue, calls } = build();
 
         queue.indexFile("file:///c.tw");
         await queue.run();
         queue.indexFile("file:///d.tw");
         await queue.run();
         const afterFirst = calls.length;
-        advance(100);
+        clock.tick(100);
         await queue.run();
 
         expect(afterFirst).to.eql(3);

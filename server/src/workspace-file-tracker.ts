@@ -28,6 +28,10 @@ export interface WorkspaceFileTrackerDeps {
     logError(message: string): void;
     /** Re-index an open `.js` buffer. */
     indexScriptFile(document: TextDocument, role: ScriptFileRole): void;
+    /** Get a `.js` file's contents: the open buffer if there is one, else the file on disk. */
+    readScript(uri: string): Promise<TextDocument | undefined>;
+    /** The set of resolved `.js` files changed, so features should be re-registered. */
+    scriptFilesChanged(uris: string[]): void;
     /** Re-validate every open Twee document. */
     revalidateOpenTweeDocuments(): Promise<void>;
 }
@@ -46,6 +50,7 @@ export interface WatchedFileChange {
 export class WorkspaceFileTracker {
     private pendingScripts = new Map<string, TextDocument>();
     private tweeFiles: Set<string> | undefined;
+    private scriptRoles: Map<string, ScriptFileRole> | undefined;
     private scriptTimer: ReturnType<typeof setTimeout> | undefined;
     private pendingCreates = new Set<string>();
     private createTimer: ReturnType<typeof setTimeout> | undefined;
@@ -89,6 +94,12 @@ export class WorkspaceFileTracker {
      */
     setFileSets(files: ProjectFiles): void {
         this.tweeFiles = new Set(files.tweeFiles);
+        this.scriptRoles = new Map<string, ScriptFileRole>([
+            ...files.includedScripts.map(
+                (u) => [u, "included-script"] as const,
+            ),
+            ...files.storyScriptFiles.map((u) => [u, "story-script"] as const),
+        ]);
     }
 
     /**
@@ -98,19 +109,29 @@ export class WorkspaceFileTracker {
         changes: WatchedFileChange[],
     ): Promise<void> {
         const tweeChanges: WatchedFileChange[] = [];
+        const scriptChanges: WatchedFileChange[] = [];
         for (const change of changes) {
             if (/\.twee-config\.(json|ya?ml)$/.test(change.uri)) {
                 void this.deps.parseMacroFile(change.uri);
                 this.deps.onMacroChanges();
             } else if (change.kind === "created") {
                 this.handleCreated(change.uri);
+            } else if (change.uri.endsWith(".js")) {
+                // A deleted script is dropped by the re-resolve's diff; a rename arrives as delete + create
+                if (change.kind === "deleted") this.handleCreated(change.uri);
+                else scriptChanges.push(change);
             } else {
                 tweeChanges.push(change);
             }
         }
-        if (tweeChanges.length === 0) return;
+        if (tweeChanges.length === 0 && scriptChanges.length === 0) return;
 
         if (!(await this.ensureFileSets())) return;
+        await this.reindexScriptsFromDisk(
+            scriptChanges
+                .map((c) => c.uri)
+                .filter((uri) => !this.deps.isOpen(uri)),
+        );
         for (const change of tweeChanges) {
             if (!this.isTrackedTweeFile(change.uri)) continue;
             if (change.kind === "deleted") {
@@ -128,7 +149,59 @@ export class WorkspaceFileTracker {
         if (!(await this.ensureFileSets())) return;
         if (this.isTrackedTweeFile(uri)) {
             this.deps.queue.indexFile(uri);
+        } else {
+            await this.reindexScriptsFromDisk([uri]);
         }
+    }
+
+    /**
+     * Re-read resolved `.js` files and re-index them, then revalidate open Twee documents.
+     * Files outside the resolved sets are ignored.
+     */
+    private async reindexScriptsFromDisk(uris: string[]): Promise<void> {
+        let reindexed = false;
+        for (const uri of uris) {
+            const role = this.scriptRoles?.get(uri);
+            if (role === undefined) continue;
+            const doc = await this.deps.readScript(uri);
+            if (doc === undefined) continue;
+            this.deps.indexScriptFile(doc, role);
+            reindexed = true;
+        }
+        if (reindexed) await this.deps.revalidateOpenTweeDocuments();
+    }
+
+    /**
+     * Bring the index and `.js` registration in step with a changed script file set.
+     *
+     * @param previous The script files and roles before the change.
+     */
+    private async applyScriptSetChange(
+        previous: Map<string, ScriptFileRole>,
+    ): Promise<void> {
+        const current = this.scriptRoles ?? new Map();
+        let membershipChanged = false;
+        let reindexed = false;
+        for (const uri of previous.keys()) {
+            if (!current.has(uri)) {
+                this.deps.index.removeDocument(uri);
+                membershipChanged = true;
+                reindexed = true;
+            }
+        }
+        for (const [uri, role] of current) {
+            const oldRole = previous.get(uri);
+            if (oldRole === role) continue;
+            if (oldRole === undefined) membershipChanged = true;
+            const doc = await this.deps.readScript(uri);
+            if (doc !== undefined) {
+                this.deps.indexScriptFile(doc, role);
+                reindexed = true;
+            }
+        }
+        if (membershipChanged)
+            this.deps.scriptFilesChanged([...current.keys()]);
+        if (reindexed) await this.deps.revalidateOpenTweeDocuments();
     }
 
     /**
@@ -177,7 +250,11 @@ export class WorkspaceFileTracker {
     private resolveFileSets(): Promise<boolean> {
         const result = this.resolveChain.then(async () => {
             try {
+                const previous = this.scriptRoles;
                 this.setFileSets(await this.deps.findProjectFiles());
+                if (previous !== undefined) {
+                    await this.applyScriptSetChange(previous);
+                }
                 return true;
             } catch (err) {
                 this.deps.logError(
