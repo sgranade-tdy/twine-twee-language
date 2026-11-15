@@ -132,9 +132,14 @@ interface Mutation {
     /**
      * Break the text.
      *
-     * @returns The broken text and the length of the prefix it leaves intact.
+     * @returns The broken text, and a function that maps a span of the
+     * original text to its offset in the broken text, or to undefined if the
+     * mutation didn't leave the span intact.
      */
-    apply: (text: string) => { broken: string; intactLength: number };
+    apply: (text: string) => {
+        broken: string;
+        intactAt: (offset: number, length: number) => number | undefined;
+    };
 }
 
 /**
@@ -145,7 +150,12 @@ function insertMidFile(line: string): Mutation["apply"] {
         const lineStart = text.lastIndexOf("\n", text.length / 2) + 1;
         return {
             broken: text.slice(0, lineStart) + line + text.slice(lineStart),
-            intactLength: lineStart,
+            intactAt: (offset, length) =>
+                offset + length <= lineStart
+                    ? offset
+                    : offset >= lineStart
+                      ? offset + line.length
+                      : undefined,
         };
     };
 }
@@ -159,7 +169,11 @@ const mutations: Mutation[] = [
         name: "truncation at 60%",
         apply: (text) => {
             const cut = Math.floor(text.length * 0.6);
-            return { broken: text.slice(0, cut), intactLength: cut };
+            return {
+                broken: text.slice(0, cut),
+                intactAt: (offset, length) =>
+                    offset + length <= cut ? offset : undefined,
+            };
         },
     },
     {
@@ -304,75 +318,60 @@ describe("Script file corpus", () => {
     });
 
     describe("Broken files", () => {
-        const cases: [string, FormatName][] = [
-            ["jquery.min.js", "SugarCube"],
-            ["jquery.min.js", "Chapbook"],
-            ["story-sugarcube.js", "SugarCube"],
-            ["story-chapbook.js", "Chapbook"],
+        const cases: [string, FormatName, { hasStateRoots: boolean }][] = [
+            ["jquery.min.js", "SugarCube", { hasStateRoots: false }],
+            ["jquery.min.js", "Chapbook", { hasStateRoots: false }],
+            ["story-sugarcube.js", "SugarCube", { hasStateRoots: true }],
+            ["story-chapbook.js", "Chapbook", { hasStateRoots: true }],
         ];
-        for (const [fixture, format] of cases) {
+        const nameOf = (o: Occurrence) => `${o.kind} ${o.contents}`;
+
+        for (const [fixture, format, { hasStateRoots }] of cases) {
             const text = readFixture(fixture);
             for (const mutation of mutations) {
                 describe(`${fixture} with ${mutation.name} under ${format}`, () => {
-                    const { broken, intactLength } = mutation.apply(text);
+                    const { broken, intactAt } = mutation.apply(text);
+                    let original: Occurrence[];
+                    let found: Occurrence[];
+
+                    before(() => {
+                        const o = indexScriptFile(text, format, "story-script");
+                        original = occurrences(o.index, o.doc, format);
+                        const b = indexScriptFile(
+                            broken,
+                            format,
+                            "story-script",
+                        );
+                        found = occurrences(b.index, b.doc, format);
+                    });
 
                     it("should fall back to the loose parse", () => {
                         expect(parseErrors(broken, format)).to.not.be.empty;
                     });
 
-                    it("should keep exact offsets and find the intact part's occurrences", () => {
-                        const original = indexScriptFile(
-                            text,
-                            format,
-                            "story-script",
-                        );
-                        const intact = occurrences(
-                            original.index,
-                            original.doc,
-                            format,
-                        ).filter(
-                            (o) => o.offset + o.text.length <= intactLength,
-                        );
-                        const { index, doc } = indexScriptFile(
-                            broken,
-                            format,
-                            "story-script",
-                        );
-
-                        if (fixture.startsWith("story-")) {
-                            expect(intact).to.not.be.empty;
-                        }
-                        const found = occurrences(index, doc, format);
-
+                    it("should keep exact offsets", () => {
                         expectExactOffsets(found);
-                        expect(found.map(summarize)).to.include.members(
-                            intact.map(summarize),
-                        );
+                    });
+
+                    it("should find the occurrences the mutation left intact", () => {
+                        const intact = original.flatMap((o) => {
+                            const at = intactAt(o.offset, o.text.length);
+                            return at === undefined
+                                ? []
+                                : [`${nameOf(o)} @${at}`];
+                        });
+
+                        if (hasStateRoots) expect(intact).to.not.be.empty;
+                        expect(
+                            found.map((o) => `${nameOf(o)} @${o.offset}`),
+                        ).to.include.members(intact);
                     });
 
                     if (format === "SugarCube") {
                         it("should yield no junk occurrences", () => {
-                            const original = indexScriptFile(
-                                text,
-                                format,
-                                "story-script",
+                            expect(original.map(nameOf)).to.include.members(
+                                found.map(nameOf),
                             );
-                            const originalNames = occurrences(
-                                original.index,
-                                original.doc,
-                                format,
-                            ).map((o) => `${o.kind} ${o.contents}`);
-                            const { index, doc } = indexScriptFile(
-                                broken,
-                                format,
-                                "story-script",
-                            );
-
-                            const found = occurrences(index, doc, format).map(
-                                (o) => `${o.kind} ${o.contents}`,
-                            );
-
-                            expect(originalNames).to.include.members(found);
                         });
                     }
                 });

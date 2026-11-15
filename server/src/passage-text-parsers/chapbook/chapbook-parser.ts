@@ -1608,7 +1608,7 @@ function parseScript(
                 extractScriptSymbols: createChapbookScriptExtractor({
                     recordRootDeclarations: isScriptPassage,
                 }),
-                isWholeFile: state.isScriptFile,
+                isWholeFile: state.isWholeFile,
             },
         ),
         state,

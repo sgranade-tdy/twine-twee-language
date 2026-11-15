@@ -1021,7 +1021,7 @@ export function parseScriptFile(
         storyFormat,
         storyFormatParser: parser,
         callbacks,
-        isScriptFile: true,
+        isWholeFile: true,
         currentPassage: {
             name: {
                 contents: "script",

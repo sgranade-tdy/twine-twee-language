@@ -52,10 +52,10 @@ export interface ParsingState {
      */
     callbacks: ParserCallbacks;
     /**
-     * True if the text being parsed is an entire local `.js` file rather than
-     * a passage.
+     * True if the text being parsed is an entire local `.js` file (a story
+     * script file or included script) rather than a passage.
      */
-    isScriptFile?: boolean;
+    isWholeFile?: boolean;
 }
 
 /**
