@@ -147,6 +147,25 @@ everything after a computed segment in `$a[i].b` are not. Unresolvable segments
 are dropped rather than guessed at, because a property indexed under the wrong
 prefix renames the wrong thing.
 
+**Opaque assignment**: an assignment whose value could be an object of unknown
+shape — a call, `new`, a member access or identifier that isn't a story
+variable, `this`, a `for…range` value, a SugarCube receiver, or a
+conditional/logical expression with any such branch. It marks the assigned path
+as **opaque**: never-set warnings are suppressed for every story property beneath
+it, project-wide, even if a literal assignment elsewhere gives the path a known
+shape. Literals, arithmetic, comparisons and string building are not opaque, so
+`$x.foo` after `$x = 5` still warns. A branch that is the assigned path itself
+(`$inv = $inv || {}`) is ignored. _Avoid_: "untyped", "any", which imply a type
+system the parser doesn't have.
+
+**Shape source**: a story variable or property whose shape another path copies,
+by plain assignment (`_p = $player`), `clone()`, or object spread
+(`{...$base, a: 1}`). A path can have several shape sources; a property beneath
+it counts as set if any source sets it, and the path is opaque if any source is.
+It only affects never-set warnings: it doesn't make the two paths the same
+symbol, so find-references and rename never follow it. _Avoid_: "alias", which
+already names a binding to a state root.
+
 ## Diagnostics
 
 **Diagnostic code**: a member of `DiagnosticCodes`, with default message and
