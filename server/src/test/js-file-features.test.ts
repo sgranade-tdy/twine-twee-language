@@ -43,7 +43,7 @@ describe("Working from .js files", () => {
         ]);
     });
 
-    it("should go from a story variable in a .js file to where it's set in .tw and .js files", () => {
+    it("should go from a story variable in a .js file to its assignments in .tw and .js files", () => {
         const { index, script } = build(
             "State.variables.gold = 2;\n",
             "<<set $gold to 1>>",

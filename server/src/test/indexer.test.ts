@@ -668,7 +668,7 @@ describe("Indexer", () => {
             expect(qualifiesNow("gold", "file:///bare.js")).to.be.true;
         });
 
-        it("should not go to a story variable's sets from a bare name a root declaration binds", () => {
+        it("should not go to a story variable's assignments from a bare name a root declaration binds", () => {
             const index = indexWithFormat("Chapbook", "2.3.0");
             for (const [uri, content] of [
                 ["file:///set.js", "engine.state.set('gold', 1);"],
@@ -745,7 +745,7 @@ describe("Indexer", () => {
                 ]);
             });
 
-            it("should go to a definition in a script file", () => {
+            it("should go to an assignment in a script file", () => {
                 const index = indexSugarCubeProject();
                 const story = buildDocument({
                     uri: "file:///story.tw",
@@ -763,7 +763,7 @@ describe("Indexer", () => {
                 );
             });
 
-            it("should go to a Chapbook definition in a script file", () => {
+            it("should go to a Chapbook assignment in a script file", () => {
                 const index = new Index();
                 uut.updateProjectIndex(
                     buildDocument({
@@ -799,7 +799,7 @@ describe("Indexer", () => {
                 ]);
             });
 
-            it("should go to every place a story variable is set, including Twee files", () => {
+            it("should go to every assignment to a story variable, including in Twee files", () => {
                 const index = indexSugarCubeProject();
                 uut.updateProjectIndex(
                     buildDocument({

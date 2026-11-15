@@ -16,7 +16,7 @@
 **Status:** ready-for-agent
 
 - [ ] Find-references on `$gold` in a `.tw` file lists `State.variables.gold` in a story script file and in an included script
-- [ ] Go-to-definition on a `.tw` read lands on a `.js` assignment
+- [x] Go-to-definition on a `.tw` read lands on a `.js` assignment (done in ticket 29)
 - [ ] A variable set only in a story script file or an included script gets no `variable-never-set`, in both formats
 - [ ] A Chapbook root-level declaration in a story script file stops a bare name from qualifying in any other story script file or `script` passage, but not in an included script
 - [ ] A `.js` file matched by both settings is indexed once, as a story script file

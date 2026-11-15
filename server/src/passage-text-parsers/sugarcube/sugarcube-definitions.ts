@@ -1,11 +1,12 @@
-import { Definition, Location, Position } from "vscode-languageserver";
+import { Definition, Position } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
 import { ProjectIndex } from "../../project-index";
+import { getAssignmentLocations } from "../assignments";
 import { OSugarCubeSymbolKind } from "./types";
 
 /**
- * Get the definition of a story variable: every location that sets it.
+ * Get a story variable's definition, which is every assignment to it.
  */
 export function getDefinitionAt(
     document: TextDocument,
@@ -19,15 +20,9 @@ export function getDefinitionAt(
     )
         return undefined;
 
-    const locations: Location[] = [];
-    for (const uri of index.getIndexedUris()) {
-        for (const setRef of index.getReferences(
-            uri,
-            OSugarCubeSymbolKind.VariableSet,
-        ) ?? []) {
-            if (setRef.contents === ref.contents)
-                locations.push(...setRef.locations);
-        }
-    }
-    return locations.length > 0 ? locations : undefined;
+    return getAssignmentLocations(
+        index,
+        OSugarCubeSymbolKind.VariableSet,
+        ref.contents,
+    );
 }

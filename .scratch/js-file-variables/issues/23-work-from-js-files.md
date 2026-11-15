@@ -10,10 +10,10 @@
 
 **Blocked by:** 18, 21
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Only resolved `.js` files are in the registered selector, and paths with glob metacharacters are escaped
-- [ ] Find-references and definition started from `State.variables.gold` in a `.js` file list the `.tw` and `.js` occurrences
-- [ ] A burst of `.js` edits causes one re-parse after the debounce (fake timers)
-- [ ] Setting a variable in an open `.js` buffer clears `variable-never-set` in an open `.tw` document without editing it
-- [ ] A rename requested before the debounce fires uses the current buffer contents
+- [x] Only resolved `.js` files are in the registered selector, and paths with glob metacharacters are escaped
+- [x] Find-references and definition started from `State.variables.gold` in a `.js` file list the `.tw` and `.js` occurrences (definition lists assignments only, per ticket 29)
+- [x] A burst of `.js` edits causes one re-parse after the debounce (fake timers)
+- [x] Setting a variable in an open `.js` buffer clears `variable-never-set` in an open `.tw` document without editing it
+- [x] A rename requested before the debounce fires uses the current buffer contents

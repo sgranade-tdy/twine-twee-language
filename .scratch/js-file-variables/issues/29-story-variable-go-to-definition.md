@@ -10,7 +10,7 @@
 
 **Status:** done
 
-**Decision:** the definition is every location that sets the variable (`.tw` and `.js`), returned as a list. Starting from a set lands on all sets, including itself. A Chapbook bare name that a root declaration binds has no definition.
+**Decision:** the definition is every assignment to the variable (`.tw` and `.js`), returned as a list. Starting from an assignment lands on all assignments, including itself. A Chapbook bare name that a root declaration binds has no definition.
 
 - [x] Go-to-definition on a `.tw` read lands on a `.js` assignment, in both formats
 - [x] Go-to-definition on a `.tw` read lands on a `.tw` set
