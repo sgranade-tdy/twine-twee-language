@@ -157,7 +157,8 @@ individually disableable — which is why codes stay coarse.
 
 **Resolved file sets**: the three URI lists the client resolves from the
 project's configuration: Twee files, story script files and included scripts
-(`ProjectFiles` in code). The server re-resolves them on every workspace index
-and after a file is created. A watcher event matters only if its URI is in one
+(`ProjectFiles` in code). The server drops any `.js` file over 5 MB on disk
+from them, and re-resolves them on every workspace index, after a file is
+created, and when a `.js` file's size crosses that limit. A watcher event matters only if its URI is in one
 of the sets (or, for a delete, in the index), so ignored files stay out of the
 index. _Avoid_: "project files", which suggests every file in the folder.

@@ -6,9 +6,15 @@
 
 **Blocked by:** 23
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A faked 5 MB + 1 file is skipped: it isn't indexed or in the selector, it gets one output-channel line, and it raises one warning notification
-- [ ] A second oversized file in the same session gets an output line but no second warning
-- [ ] The warning says the file wasn't scanned, that rename and find-references won't see uses in it, and that adding it to `ignores` silences the warning
-- [ ] A file just under the limit is indexed normally
+- [x] A faked 5 MB + 1 file is skipped: it isn't indexed or in the selector, it gets one output-channel line, and it raises one warning notification
+- [x] A second oversized file in the same session gets an output line but no second warning
+- [x] The warning says the file wasn't scanned, that rename and find-references won't see uses in it, and that adding it to `ignores` silences the warning
+- [x] A file just under the limit is indexed normally
+
+## Comments
+
+- The gate lives in `WorkspaceFileTracker.fetchScannableFileSets`; the indexing queue resolves through it, so startup indexing and re-resolves both drop oversized files. The client answers a new `fs/stat` request (`StatFileRequest`).
+- Each skipped file gets one output line per session (not one per re-resolve); the warning shows once per session.
+- A `.js` file whose on-disk size crosses the limit (open or closed, or on buffer close) triggers a re-resolve, so it leaves or joins the sets like a delete or create. GLOSSARY "Resolved file sets" updated to match.

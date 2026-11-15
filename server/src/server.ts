@@ -88,7 +88,7 @@ const indexingQueue: IndexingQueue = new IndexingQueue({
     getOpenDocument: (uri) => documents.get(uri),
     getAllOpenDocuments: () => documents.all(),
     readDocument: (uri) => readDocument(uri),
-    findProjectFiles: () => fileTracker.findProjectFiles(),
+    findProjectFiles: () => fileTracker.fetchScannableFileSets(),
     findFiles: (glob) => connection.sendRequest(FindFilesRequest, glob),
     indexStoryData: (doc) =>
         updateProjectIndex(doc, ParseLevel.StoryData, projectIndex),

@@ -140,7 +140,7 @@ function harness(
         getOpenDocument: (uri) => openDocs.get(uri),
         getAllOpenDocuments: () => [...openDocs.values()],
         readDocument,
-        findProjectFiles: () => tracker.findProjectFiles(),
+        findProjectFiles: () => tracker.fetchScannableFileSets(),
         findFiles: async () => [],
         indexStoryData: (doc) =>
             updateProjectIndex(doc, ParseLevel.StoryData, index),
@@ -771,7 +771,7 @@ describe("Workspace file tracker", () => {
             expect(h.warnings).to.have.length(1);
         });
 
-        it("should index a file just under the limit", async () => {
+        it("should index a file at the limit", async () => {
             const h = await startWithBigScript(maxScriptFileBytes);
 
             expect(h.index.getScriptFileRole(bigUri)).to.eql("story-script");
@@ -819,6 +819,31 @@ describe("Workspace file tracker", () => {
             expect(h.registrations).to.eql([[]]);
             expect(h.neverSet(storyUri)).to.eql(1);
             expect(h.warnings).to.have.length(1);
+        });
+
+        it("should drop an open file that grows past the limit on disk", async () => {
+            const h = await startWithBigScript(1);
+            h.openDocs.set(bigUri, twee(bigUri, setsGold));
+
+            h.sizes.set(bigUri, maxScriptFileBytes + 1);
+            await h.tracker.handleWatchedFileChanges([
+                { uri: bigUri, kind: "changed" },
+            ]);
+            await fakeClock.tickAsync(fileEventDebounceMs);
+
+            expect(h.index.isScriptFile(bigUri)).to.be.false;
+            expect(h.registrations).to.eql([[]]);
+        });
+
+        it("should not index a file that grew past the limit when its buffer closes", async () => {
+            const h = await startWithBigScript(1);
+
+            h.sizes.set(bigUri, maxScriptFileBytes + 1);
+            await h.tracker.handleDocumentClosed(bigUri);
+            await fakeClock.tickAsync(fileEventDebounceMs);
+
+            expect(h.index.isScriptFile(bigUri)).to.be.false;
+            expect(h.registrations).to.eql([[]]);
         });
 
         it("should index a skipped file that shrinks under the limit on disk", async () => {

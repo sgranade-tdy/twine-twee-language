@@ -13,6 +13,8 @@ export const fileEventDebounceMs = 300;
 /** `.js` files bigger than this on disk aren't parsed, indexed or registered. */
 export const maxScriptFileBytes = 5 * 1024 * 1024;
 
+const sizeLimitText = `${maxScriptFileBytes / (1024 * 1024)} MB`;
+
 /**
  * Everything the tracker needs from the outside world.
  */
@@ -151,12 +153,12 @@ export class WorkspaceFileTracker {
         if (tweeChanges.length === 0 && scriptChanges.length === 0) return;
 
         if (!(await this.ensureFileSets())) return;
+        // Open files are checked too, as sync doesn't tell us their on-disk size
+        const scripts = await this.withoutSizeChanges(
+            scriptChanges.map((c) => c.uri),
+        );
         await this.reindexScriptsFromDisk(
-            await this.withoutSizeChanges(
-                scriptChanges
-                    .map((c) => c.uri)
-                    .filter((uri) => !this.deps.isOpen(uri)),
-            ),
+            scripts.filter((uri) => !this.deps.isOpen(uri)),
         );
         for (const change of tweeChanges) {
             if (
@@ -197,9 +199,14 @@ export class WorkspaceFileTracker {
     }
 
     /**
-     * Ask the client for the project's file sets, minus any `.js` file too big to scan.
+     * Ask the client for the resolved file sets, minus any `.js` file too big
+     * to scan, after any resolve already running.
      */
-    async findProjectFiles(): Promise<ProjectFiles> {
+    fetchScannableFileSets(): Promise<ProjectFiles> {
+        return this.serialize(() => this.findScannableFileSets());
+    }
+
+    private async findScannableFileSets(): Promise<ProjectFiles> {
         const files = await this.deps.findProjectFiles();
         const scripts = [...files.storyScriptFiles, ...files.includedScripts];
         const oversized = new Set<string>();
@@ -242,13 +249,12 @@ export class WorkspaceFileTracker {
     private reportOversized(uri: string): void {
         if (this.loggedOversized.has(uri)) return;
         this.loggedOversized.add(uri);
-        this.deps.log(
-            `Skipped ${uri}: it's over 5 MB, so rename and find-references won't see story variable uses in it.`,
-        );
+        const reason = `it's over ${sizeLimitText}, so rename and find-references won't see story variable uses in it`;
+        this.deps.log(`Skipped ${uri}: ${reason}.`);
         if (this.warnedOversized) return;
         this.warnedOversized = true;
         this.deps.showWarning(
-            `${uri} wasn't scanned because it's over 5 MB, so rename and find-references won't see story variable uses in it. Add it to "ignores" in tt3.config.json to silence this warning.`,
+            `${uri} wasn't scanned because ${reason}. Add it to "ignores" in tt3.config.json to silence this warning.`,
         );
     }
 
@@ -276,7 +282,9 @@ export class WorkspaceFileTracker {
         if (this.isTrackedTweeFile(uri)) {
             this.deps.queue.indexFile(uri);
         } else {
-            await this.reindexScriptsFromDisk([uri]);
+            await this.reindexScriptsFromDisk(
+                await this.withoutSizeChanges([uri]),
+            );
         }
     }
 
@@ -428,7 +436,7 @@ export class WorkspaceFileTracker {
      */
     private async fetchFileSets(): Promise<boolean> {
         try {
-            this.setFileSets(await this.findProjectFiles());
+            this.setFileSets(await this.findScannableFileSets());
             return true;
         } catch (err) {
             this.deps.logError(`Couldn't resolve the project's files: ${err}`);
