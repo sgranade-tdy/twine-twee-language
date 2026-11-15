@@ -15,6 +15,7 @@ import {
     WorkspaceFileTracker,
     WorkspaceFileTrackerDeps,
     fileEventDebounceMs,
+    maxScriptFileBytes,
     scriptReparseDebounceMs,
 } from "../workspace-file-tracker";
 
@@ -54,6 +55,9 @@ function build(
         readDocument: async (uri) => twee(uri, ""),
         scriptFilesChanged: (uris) => void calls.push(`files:${uris}`),
         revalidateOpenTweeDocuments: async () => void calls.push("revalidate"),
+        stat: async () => ({ size: 0 }),
+        log: () => {},
+        showWarning: () => {},
         ...overrides,
     };
     const tracker = new WorkspaceFileTracker(deps);
@@ -94,6 +98,10 @@ function harness(
     /** Missing-passage diagnostics across open documents after each revalidation. */
     const missingPassageHistory: number[] = [];
     const errors: string[] = [];
+    /** On-disk sizes that override the length of a file's text. */
+    const sizes = new Map<string, number>();
+    const logs: string[] = [];
+    const warnings: string[] = [];
     const exists = (uris: string[]) => uris.filter((u) => files.has(u));
     const resolve =
         findProjectFiles ??
@@ -132,7 +140,7 @@ function harness(
         getOpenDocument: (uri) => openDocs.get(uri),
         getAllOpenDocuments: () => [...openDocs.values()],
         readDocument,
-        findProjectFiles: countedResolve,
+        findProjectFiles: () => tracker.findProjectFiles(),
         findFiles: async () => [],
         indexStoryData: (doc) =>
             updateProjectIndex(doc, ParseLevel.StoryData, index),
@@ -165,6 +173,11 @@ function harness(
         readDocument,
         scriptFilesChanged: (uris) => void registrations.push(uris),
         revalidateOpenTweeDocuments,
+        stat: async (uri) => ({
+            size: sizes.get(uri) ?? files.get(uri)?.length ?? 0,
+        }),
+        log: (message) => void logs.push(message),
+        showWarning: (message) => void warnings.push(message),
     });
     /** Run the queue until it has nothing left to do. */
     const drain = async () => {
@@ -206,6 +219,9 @@ function harness(
         revalidateOpenTweeDocuments,
         scripts,
         registrations,
+        sizes,
+        logs,
+        warnings,
     };
 }
 
@@ -728,6 +744,94 @@ describe("Workspace file tracker", () => {
 
             await h.tracker.handleDocumentClosed(scriptUri);
 
+            expect(h.neverSet(storyUri)).to.eql(0);
+        });
+    });
+
+    describe("oversized .js files", () => {
+        const bigUri = "file:///big.js";
+        const startWithBigScript = async (size: number) => {
+            const h = harness(
+                { [storyUri]: goldStoryText, [bigUri]: setsGold },
+                { open: { [storyUri]: goldStoryText } },
+            );
+            h.sizes.set(bigUri, size);
+            h.scripts.story.push(bigUri);
+            await h.start();
+            return h;
+        };
+
+        it("should skip a file over 5 MB with one output line and one warning", async () => {
+            const h = await startWithBigScript(maxScriptFileBytes + 1);
+
+            expect(h.index.isScriptFile(bigUri)).to.be.false;
+            expect(h.neverSet(storyUri)).to.eql(1);
+            expect(h.logs).to.have.length(1);
+            expect(h.logs[0]).to.include("big.js");
+            expect(h.warnings).to.have.length(1);
+        });
+
+        it("should index a file just under the limit", async () => {
+            const h = await startWithBigScript(maxScriptFileBytes);
+
+            expect(h.index.getScriptFileRole(bigUri)).to.eql("story-script");
+            expect(h.logs).to.eql([]);
+            expect(h.warnings).to.eql([]);
+        });
+
+        it("should log a second oversized file without a second warning", async () => {
+            const h = await startWithBigScript(maxScriptFileBytes + 1);
+            const secondUri = "file:///second.js";
+            h.files.set(secondUri, setsGold);
+            h.sizes.set(secondUri, maxScriptFileBytes + 1);
+            h.scripts.story.push(secondUri);
+
+            await h.tracker.handleWatchedFileChanges([
+                { uri: secondUri, kind: "created" },
+            ]);
+            await fakeClock.tickAsync(fileEventDebounceMs);
+
+            expect(h.index.isScriptFile(secondUri)).to.be.false;
+            expect(h.registrations.flat()).not.to.include(secondUri);
+            expect(h.logs).to.have.length(2);
+            expect(h.logs[1]).to.include("second.js");
+            expect(h.warnings).to.have.length(1);
+        });
+
+        it("should explain the skip and how to silence it in the warning", async () => {
+            const h = await startWithBigScript(maxScriptFileBytes + 1);
+
+            expect(h.warnings[0]).to.include("wasn't scanned");
+            expect(h.warnings[0]).to.include("rename and find-references");
+            expect(h.warnings[0]).to.include("ignores");
+        });
+
+        it("should drop a file that grows past the limit on disk", async () => {
+            const h = await startWithBigScript(1);
+
+            h.sizes.set(bigUri, maxScriptFileBytes + 1);
+            await h.tracker.handleWatchedFileChanges([
+                { uri: bigUri, kind: "changed" },
+            ]);
+            await fakeClock.tickAsync(fileEventDebounceMs);
+
+            expect(h.index.isScriptFile(bigUri)).to.be.false;
+            expect(h.registrations).to.eql([[]]);
+            expect(h.neverSet(storyUri)).to.eql(1);
+            expect(h.warnings).to.have.length(1);
+        });
+
+        it("should index a skipped file that shrinks under the limit on disk", async () => {
+            const h = await startWithBigScript(maxScriptFileBytes + 1);
+
+            h.sizes.set(bigUri, 1);
+            await h.tracker.handleWatchedFileChanges([
+                { uri: bigUri, kind: "changed" },
+            ]);
+            await fakeClock.tickAsync(fileEventDebounceMs);
+
+            expect(h.index.getScriptFileRole(bigUri)).to.eql("story-script");
+            expect(h.registrations).to.eql([[bigUri]]);
             expect(h.neverSet(storyUri)).to.eql(0);
         });
     });

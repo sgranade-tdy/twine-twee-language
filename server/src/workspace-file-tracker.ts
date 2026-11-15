@@ -10,6 +10,9 @@ export const scriptReparseDebounceMs = 300;
 /** How long to wait after the last create or delete event before acting on them. */
 export const fileEventDebounceMs = 300;
 
+/** `.js` files bigger than this on disk aren't parsed, indexed or registered. */
+export const maxScriptFileBytes = 5 * 1024 * 1024;
+
 /**
  * Everything the tracker needs from the outside world.
  */
@@ -31,6 +34,12 @@ export interface WorkspaceFileTrackerDeps {
     scriptFilesChanged(uris: string[]): void;
     /** Re-validate every open Twee document. */
     revalidateOpenTweeDocuments(): Promise<void>;
+    /** Get a file's on-disk metadata. */
+    stat(uri: string): Promise<{ size: number }>;
+    /** Write a line to the output channel. */
+    log(message: string): void;
+    /** Show the author a warning notification. */
+    showWarning(message: string): void;
 }
 
 /**
@@ -70,6 +79,11 @@ export class WorkspaceFileTracker {
     private fileEventTimer: ReturnType<typeof setTimeout> | undefined;
     /** Resolves run one at a time, so a slow one can't overwrite a newer result. */
     private resolveChain: Promise<unknown> = Promise.resolve();
+    /** Resolved `.js` files skipped for size, as of the last resolve. */
+    private oversizedScripts = new Set<string>();
+    /** Oversized files already reported in the output channel. */
+    private loggedOversized = new Set<string>();
+    private warnedOversized = false;
 
     constructor(private readonly deps: WorkspaceFileTrackerDeps) {}
 
@@ -138,9 +152,11 @@ export class WorkspaceFileTracker {
 
         if (!(await this.ensureFileSets())) return;
         await this.reindexScriptsFromDisk(
-            scriptChanges
-                .map((c) => c.uri)
-                .filter((uri) => !this.deps.isOpen(uri)),
+            await this.withoutSizeChanges(
+                scriptChanges
+                    .map((c) => c.uri)
+                    .filter((uri) => !this.deps.isOpen(uri)),
+            ),
         );
         for (const change of tweeChanges) {
             if (
@@ -150,6 +166,90 @@ export class WorkspaceFileTracker {
                 this.deps.queue.indexFile(change.uri);
             }
         }
+    }
+
+    /**
+     * Find changed `.js` files that crossed the size limit, and re-resolve the
+     * file sets for them, so they leave or join the sets like a delete or create.
+     *
+     * @returns The files that didn't cross the limit.
+     */
+    private async withoutSizeChanges(uris: string[]): Promise<string[]> {
+        const sizes = await Promise.all(
+            uris.map(async (uri) =>
+                this.scriptRoles?.has(uri) || this.oversizedScripts.has(uri)
+                    ? await this.isOversized(uri)
+                    : undefined,
+            ),
+        );
+        return uris.filter((uri, i) => {
+            const oversized = sizes[i];
+            if (
+                oversized === undefined ||
+                oversized === this.oversizedScripts.has(uri)
+            ) {
+                return true;
+            }
+            this.pendingCreates.add(uri);
+            this.scheduleFileEventFlush();
+            return false;
+        });
+    }
+
+    /**
+     * Ask the client for the project's file sets, minus any `.js` file too big to scan.
+     */
+    async findProjectFiles(): Promise<ProjectFiles> {
+        const files = await this.deps.findProjectFiles();
+        const scripts = [...files.storyScriptFiles, ...files.includedScripts];
+        const oversized = new Set<string>();
+        await Promise.all(
+            scripts.map(async (uri) => {
+                if (await this.isOversized(uri)) oversized.add(uri);
+            }),
+        );
+        this.oversizedScripts = oversized;
+        for (const uri of scripts.filter((u) => oversized.has(u))) {
+            this.reportOversized(uri);
+        }
+        return {
+            tweeFiles: files.tweeFiles,
+            storyScriptFiles: files.storyScriptFiles.filter(
+                (uri) => !oversized.has(uri),
+            ),
+            includedScripts: files.includedScripts.filter(
+                (uri) => !oversized.has(uri),
+            ),
+        };
+    }
+
+    /**
+     * Whether a file is over the size limit on disk. A file we can't stat
+     * isn't, so reading it reports the failure.
+     */
+    private async isOversized(uri: string): Promise<boolean> {
+        try {
+            return (await this.deps.stat(uri)).size > maxScriptFileBytes;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Tell the author about a skipped file: an output line once per file,
+     * and a warning once per session.
+     */
+    private reportOversized(uri: string): void {
+        if (this.loggedOversized.has(uri)) return;
+        this.loggedOversized.add(uri);
+        this.deps.log(
+            `Skipped ${uri}: it's over 5 MB, so rename and find-references won't see story variable uses in it.`,
+        );
+        if (this.warnedOversized) return;
+        this.warnedOversized = true;
+        this.deps.showWarning(
+            `${uri} wasn't scanned because it's over 5 MB, so rename and find-references won't see story variable uses in it. Add it to "ignores" in tt3.config.json to silence this warning.`,
+        );
     }
 
     /**
@@ -328,7 +428,7 @@ export class WorkspaceFileTracker {
      */
     private async fetchFileSets(): Promise<boolean> {
         try {
-            this.setFileSets(await this.deps.findProjectFiles());
+            this.setFileSets(await this.findProjectFiles());
             return true;
         } catch (err) {
             this.deps.logError(`Couldn't resolve the project's files: ${err}`);
