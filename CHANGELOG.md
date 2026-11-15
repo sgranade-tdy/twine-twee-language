@@ -50,6 +50,7 @@ Three big changes:
 - SugarCube: Now includes variables and properties only assigned to in e.g. `<<set>>` macros in completions.
 - SugarCube: No longer incorrectly indexes apparent variables in non-data HTML attributes.
 - SugarCube: Now correctly places the end of diagnostic squiggles on TwineScript expressions.
+- Typing a new story format or version in StoryData no longer triggers a download prompt and reindex for every intermediate value.
 
 ## [1.1.5] - 2026 04 12
 
