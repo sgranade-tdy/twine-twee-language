@@ -7,7 +7,7 @@ import { Index, ScriptFileRole } from "./project-index";
 /** How long to wait after the last `.js` edit before re-parsing. */
 export const scriptReparseDebounceMs = 300;
 
-/** How long to wait after the last create event before re-resolving the file sets. */
+/** How long to wait after the last create or delete event before re-resolving the file sets. */
 export const fileSetResolveDebounceMs = 300;
 
 /**
@@ -52,8 +52,8 @@ export class WorkspaceFileTracker {
     private tweeFiles: Set<string> | undefined;
     private scriptRoles: Map<string, ScriptFileRole> | undefined;
     private scriptTimer: ReturnType<typeof setTimeout> | undefined;
-    private pendingCreates = new Set<string>();
-    private createTimer: ReturnType<typeof setTimeout> | undefined;
+    private pendingResolves = new Set<string>();
+    private resolveTimer: ReturnType<typeof setTimeout> | undefined;
     /** Resolves run one at a time, so a slow one can't overwrite a newer result. */
     private resolveChain: Promise<unknown> = Promise.resolve();
 
@@ -115,10 +115,10 @@ export class WorkspaceFileTracker {
                 void this.deps.parseMacroFile(change.uri);
                 this.deps.onMacroChanges();
             } else if (change.kind === "created") {
-                this.handleCreated(change.uri);
+                this.scheduleResolve(change.uri);
             } else if (change.uri.endsWith(".js")) {
                 // A deleted script is dropped by the re-resolve's diff; a rename arrives as delete + create
-                if (change.kind === "deleted") this.handleCreated(change.uri);
+                if (change.kind === "deleted") this.scheduleResolve(change.uri);
                 else scriptChanges.push(change);
             } else {
                 tweeChanges.push(change);
@@ -205,23 +205,23 @@ export class WorkspaceFileTracker {
     }
 
     /**
-     * Note a created file; the file sets are re-resolved after a debounce.
+     * Note a created or deleted file; the file sets are re-resolved after a debounce.
      */
-    private handleCreated(uri: string): void {
-        this.pendingCreates.add(uri);
-        clearTimeout(this.createTimer);
-        this.createTimer = setTimeout(
-            () => void this.flushPendingCreates(),
+    private scheduleResolve(uri: string): void {
+        this.pendingResolves.add(uri);
+        clearTimeout(this.resolveTimer);
+        this.resolveTimer = setTimeout(
+            () => void this.flushPendingResolves(),
             fileSetResolveDebounceMs,
         );
     }
 
-    private async flushPendingCreates(): Promise<void> {
-        this.createTimer = undefined;
-        const created = [...this.pendingCreates];
-        this.pendingCreates.clear();
+    private async flushPendingResolves(): Promise<void> {
+        this.resolveTimer = undefined;
+        const pending = [...this.pendingResolves];
+        this.pendingResolves.clear();
         if (!(await this.resolveFileSets())) return;
-        for (const uri of created) {
+        for (const uri of pending) {
             if (this.isTrackedTweeFile(uri)) {
                 this.deps.queue.indexFile(uri);
             }
