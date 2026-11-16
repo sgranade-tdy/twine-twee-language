@@ -448,6 +448,69 @@ describe("SugarCube Parser", () => {
             ]);
         });
 
+        describe("state roots in TwineScript", () => {
+            const referencesFor = (passage: string) => {
+                const header = ":: Passage\n";
+                const callbacks = new MockCallbacks();
+                const state = buildParsingState({
+                    content: header + passage,
+                    callbacks: callbacks,
+                });
+                uut.getSugarCubeParser(undefined)?.parsePassageText(
+                    passage,
+                    header.length,
+                    state,
+                );
+                return callbacks.references.filter(
+                    (r) => r.contents !== "run" && r.contents !== "set",
+                );
+            };
+
+            it("should capture State.setVar with a literal key as a variable set", () => {
+                const result = referencesFor(
+                    "<<run State.setVar('$x', 5)>>",
+                ).map((r) => [r.contents, r.kind]);
+
+                expect(result).to.eql([
+                    ["$x", OSugarCubeSymbolKind.VariableSet],
+                ]);
+            });
+
+            it("should record a spread of a state root as a shape source", () => {
+                const result = referencesFor(
+                    "<<run State.variables.o = {...State.variables.base, a: 1}>>",
+                ).find((r) => r.contents === "$o");
+
+                expect(result?.shapeSources).to.eql(["$base"]);
+                expect(result?.opaque).to.not.be.true;
+            });
+
+            it("should record a copy through a state root as a shape source", () => {
+                const result = referencesFor(
+                    "<<set _p to State.variables.player>>",
+                ).find((r) => r.contents === "_p");
+
+                expect(result?.shapeSources).to.eql(["$player"]);
+                expect(result?.opaque).to.not.be.true;
+            });
+
+            it("should record a sigiled variable assigned through a state root as a shape source", () => {
+                const result = referencesFor(
+                    "<<run State.variables.r = $a>>",
+                ).find((r) => r.contents === "$r");
+
+                expect(result?.shapeSources).to.eql(["$a"]);
+            });
+
+            it("should not capture a bare identifier as a story variable", () => {
+                const result = referencesFor(
+                    "<<run State.variables.r = fn()>>",
+                ).map((r) => r.contents);
+
+                expect(result).to.eql(["$r"]);
+            });
+        });
+
         it("should capture an assignment in a <<print>> macro as a property read", () => {
             const header = ":: Passage\n";
             const passage = "<<print $a.b = 1>>";

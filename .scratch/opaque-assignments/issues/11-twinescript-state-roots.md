@@ -4,13 +4,14 @@
 
 **Blocked by:** none
 
-**Status:** open
+**Status:** done
 
-- [ ] `<<run State.setVar('$x', 5)>>` sets `$x` (today it warns on `$x` and treats `setVar` as a never-set property)
-- [ ] `<<run State.variables.o = {...State.variables.base, a: 1}>>` records `$base` as a shape source, so `$o.c` warns when `$base` never sets `c` (today the spread's root is `State`, so `$o` is opaque: silent, not noisy)
-- [ ] Copies through a state root (`<<set _p to State.variables.player>>`) record `$player` as a shape source rather than going opaque
-- [ ] Decide whether to replace the legacy rewrite with the SugarCube script extractor (`sugarcube-script-symbols.ts`), which also covers `variables()`, `SugarCube.State` and aliases, or to extend the rewrite
+- [x] `<<run State.setVar('$x', 5)>>` sets `$x` (today it warns on `$x` and treats `setVar` as a never-set property)
+- [x] `<<run State.variables.o = {...State.variables.base, a: 1}>>` records `$base` as a shape source, so `$o.c` warns when `$base` never sets `c` (today the spread's root is `State`, so `$o` is opaque: silent, not noisy)
+- [x] Copies through a state root (`<<set _p to State.variables.player>>`) record `$player` as a shape source rather than going opaque
+- [x] Decide whether to replace the legacy rewrite with the SugarCube script extractor (`sugarcube-script-symbols.ts`), which also covers `variables()`, `SugarCube.State` and aliases, or to extend the rewrite
 
 ## Comments
 
+- Resolved here: TwineScript now keeps only sigiled names (plus `settings`/`setup`) as story variables, which fixes this. Decision on the legacy rewrite: replaced by composing the SugarCube script extractor with the default one.
 - Unrelated but seen in the same probe: in `<<run State.variables.r = fn()>>`, the bare `fn` warns as a never-set story variable.

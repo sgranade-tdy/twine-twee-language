@@ -1,9 +1,11 @@
 import { TextDocument } from "vscode-languageserver-textdocument";
 
 import {
+    extractSymbols,
     isEveryIdentifierAVariable,
     JSPropertyLabel,
     parseJSStrict,
+    ScriptSymbolExtractor,
     TokenizedJS,
     tokenizeJavaScript,
 } from "../../../js-parser";
@@ -13,6 +15,7 @@ import {
     collisionProneBrowserGlobals,
     jQueryGlobals,
 } from "../../host-globals";
+import { createSugarCubeScriptExtractor } from "../sugarcube-script-symbols";
 import { StoryFormatParsingState, tokenizeWithScratchState } from "../../types";
 
 /**
@@ -294,7 +297,20 @@ function resugarShapeSources(
         if (label.shapeSources === undefined) continue;
         const sources: string[] = [];
         for (const source of label.shapeSources) {
+            const stateRootSource = /^State\.(variables|temporary)\.(.+)$/.exec(
+                source,
+            );
+            if (stateRootSource) {
+                const sigil = stateRootSource[1] === "variables" ? "$" : "_";
+                sources.push(sigil + stateRootSource[2]);
+                continue;
+            }
             const [root, ...rest] = source.split(".");
+            // Sources from the state-root extractor are already sugared
+            if (/^[$_][A-Za-z$_]/.test(root)) {
+                sources.push(source);
+                continue;
+            }
             const sugaredRoot = sugaredNames.get(root);
             if (sugaredRoot === undefined) {
                 label.opaque = true;
@@ -348,6 +364,40 @@ export function tokenizeTwineScriptExpression(
         desugared,
     );
 
+    // Bare sigiled variables come from the default extractor, and story
+    // state reached through a state root (`State.variables.x`) from SugarCube's
+    const stateRootExtractor = createSugarCubeScriptExtractor({
+        sugaredSigil: (id) => {
+            const { sugaredText } = getSugaredPositionAndNewText(
+                id.start,
+                positionMapping,
+            );
+            return sugaredText === "$" || sugaredText === "_"
+                ? sugaredText
+                : undefined;
+        },
+    });
+    const extractScriptSymbols: ScriptSymbolExtractor = (context) => {
+        const bare = extractSymbols(
+            context.ast,
+            context.isGlobalName,
+            context.isAssignmentContext,
+        );
+        const stateRooted = stateRootExtractor(context);
+        return {
+            variables: [...bare.variables, ...stateRooted.variables].sort(
+                (a, b) => a.at - b.at,
+            ),
+            properties: [
+                ...bare.properties.filter(
+                    (p) =>
+                        p.scope !== "State" && !p.scope?.startsWith("State."),
+                ),
+                ...stateRooted.properties,
+            ].sort((a, b) => a.at - b.at),
+        };
+    };
+
     const jsTokens = tokenizeWithScratchState(
         storyFormatState,
         (desugaredStoryFormatState) =>
@@ -357,7 +407,7 @@ export function tokenizeTwineScriptExpression(
                 0, // offset of 0 since the desugared expression starts at the start of the doc
                 desugaredDocument,
                 desugaredStoryFormatState,
-                { isAssignmentContext: isSetterContext },
+                { isAssignmentContext: isSetterContext, extractScriptSymbols },
             ),
         // Adjust semantic token locations and (if needed) text
         (t) => {
@@ -412,6 +462,17 @@ export function tokenizeTwineScriptExpression(
     }
 
     resugarShapeSources(jsTokens, desugared, positionMapping);
+
+    // In TwineScript only sigiled names (and `settings` and `setup`) are story
+    // variables; other bare identifiers are plain JavaScript
+    const isStoryRoot = (name: string) =>
+        /^[$_]/.test(name) || name === "settings" || name === "setup";
+    jsTokens.variables = jsTokens.variables.filter((v) =>
+        isStoryRoot(v.contents),
+    );
+    jsTokens.properties = jsTokens.properties.filter(
+        (p) => p.prefix !== undefined && isStoryRoot(p.prefix.split(".")[0]),
+    );
 
     // Adjust diagnostic location
     if (jsTokens.error) {

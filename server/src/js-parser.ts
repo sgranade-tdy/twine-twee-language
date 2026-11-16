@@ -139,7 +139,7 @@ export interface ScriptVariableOccurrence extends ValueShape {
 export interface ScriptPropertyOccurrence extends ValueShape {
     text: string;
     at: number;
-    scope: string;
+    scope?: string;
     assigned: boolean;
     isCallee: boolean;
 }
@@ -153,6 +153,7 @@ export type ScriptSymbolExtractor = (context: {
     text: string;
     scopeManager: eslintScope.ScopeManager;
     isGlobalName: (name: string) => boolean;
+    isAssignmentContext: boolean;
 }) => {
     variables: ScriptVariableOccurrence[];
     properties: ScriptPropertyOccurrence[];
@@ -1444,7 +1445,7 @@ interface RawPropertyOccurrence extends ValueShape {
  * @param isAssignmentContext True if write-shaped syntax counts as an assignment.
  * @returns Variable and property occurrences, in ascending order of position.
  */
-function extractSymbols(
+export function extractSymbols(
     ast: acorn.Node,
     isGlobalName: IsGlobalName,
     isAssignmentContext: boolean,
@@ -1929,6 +1930,7 @@ export function tokenizeJavaScript(
                   text,
                   scopeManager: analyzeScopes(ast),
                   isGlobalName,
+                  isAssignmentContext,
               })
             : extractSymbols(ast, isGlobalName, isAssignmentContext);
         for (const variable of variables) {
