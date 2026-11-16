@@ -17,3 +17,4 @@
 
 - The ticket 07 spec review found the shape-source gap. Probing turned up the false warning on a chained write, which was already broken at 47a5d38.
 - Done. Go-to-definition doesn't support properties in either format (spec: "Go-to-definition doesn't work on properties at all today"), so only find-references and rename are tested for the chained property. A method call off a chain (`get('inv').push(x)`) records the callee as a property, the same as SugarCube's `$inv.push()`. The check already skips built-in methods.
+- Go-to-definition for properties, including chained ones, is now tracked in `../../property-definitions/issues/01-property-go-to-definition.md`.

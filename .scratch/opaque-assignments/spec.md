@@ -182,6 +182,8 @@ Add focused cases to the existing parser and diagnostics test files. Cover:
   so that `$player.hp` doesn't reach `$enemy.hp` through `_p`.
   Go-to-definition doesn't work on properties at all today. Revisit if
   property definitions are ever added.
+  Property definitions are planned in `../property-definitions/spec.md`,
+  which also leaves shape sources unfollowed.
 
 ### Future directions for fuller un-opaquing (exploration only)
 
