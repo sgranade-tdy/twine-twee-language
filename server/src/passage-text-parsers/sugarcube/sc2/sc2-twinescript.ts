@@ -1,11 +1,9 @@
 import { TextDocument } from "vscode-languageserver-textdocument";
 
 import {
-    extractSymbols,
     isEveryIdentifierAVariable,
     JSPropertyLabel,
     parseJSStrict,
-    ScriptSymbolExtractor,
     TokenizedJS,
     tokenizeJavaScript,
 } from "../../../js-parser";
@@ -15,7 +13,7 @@ import {
     collisionProneBrowserGlobals,
     jQueryGlobals,
 } from "../../host-globals";
-import { createSugarCubeScriptExtractor } from "../sugarcube-script-symbols";
+import { extractTwineScriptSymbols } from "../sugarcube-script-symbols";
 import { StoryFormatParsingState, tokenizeWithScratchState } from "../../types";
 
 /**
@@ -297,17 +295,10 @@ function resugarShapeSources(
         if (label.shapeSources === undefined) continue;
         const sources: string[] = [];
         for (const source of label.shapeSources) {
-            const stateRootSource = /^State\.(variables|temporary)\.(.+)$/.exec(
-                source,
-            );
-            if (stateRootSource) {
-                const sigil = stateRootSource[1] === "variables" ? "$" : "_";
-                sources.push(sigil + stateRootSource[2]);
-                continue;
-            }
             const [root, ...rest] = source.split(".");
-            // Sources from the state-root extractor are already sugared
-            if (/^[$_][A-Za-z$_]/.test(root)) {
+            // A state root's path is already sigiled, since desugaring
+            // leaves no sigil at the start of a name
+            if (root.startsWith("$") || root.startsWith("_")) {
                 sources.push(source);
                 continue;
             }
@@ -326,8 +317,11 @@ function resugarShapeSources(
 /**
  * Tokenize a TwineScript expression and find referenced variables and properties in it.
  *
- * Returned properties are only those for which the parser could trace their "ownership"
- * back to a root variable.
+ * Story variables are sigiled names (`$x`, `_x`) and those reached through a
+ * SugarCube state root (`State.variables.x`), per ADR-0006. Other bare names,
+ * and their properties, aren't returned, and neither are properties whose
+ * "ownership" the parser couldn't trace back to a story variable or to
+ * `settings` or `setup`.
  *
  * @param expression Expression to parse.
  * @param offset Offset into the document where the expression occurs.
@@ -364,40 +358,6 @@ export function tokenizeTwineScriptExpression(
         desugared,
     );
 
-    // Bare sigiled variables come from the default extractor, and story
-    // state reached through a state root (`State.variables.x`) from SugarCube's
-    const stateRootExtractor = createSugarCubeScriptExtractor({
-        sugaredSigil: (id) => {
-            const { sugaredText } = getSugaredPositionAndNewText(
-                id.start,
-                positionMapping,
-            );
-            return sugaredText === "$" || sugaredText === "_"
-                ? sugaredText
-                : undefined;
-        },
-    });
-    const extractScriptSymbols: ScriptSymbolExtractor = (context) => {
-        const bare = extractSymbols(
-            context.ast,
-            context.isGlobalName,
-            context.isAssignmentContext,
-        );
-        const stateRooted = stateRootExtractor(context);
-        return {
-            variables: [...bare.variables, ...stateRooted.variables].sort(
-                (a, b) => a.at - b.at,
-            ),
-            properties: [
-                ...bare.properties.filter(
-                    (p) =>
-                        p.scope !== "State" && !p.scope?.startsWith("State."),
-                ),
-                ...stateRooted.properties,
-            ].sort((a, b) => a.at - b.at),
-        };
-    };
-
     const jsTokens = tokenizeWithScratchState(
         storyFormatState,
         (desugaredStoryFormatState) =>
@@ -407,7 +367,10 @@ export function tokenizeTwineScriptExpression(
                 0, // offset of 0 since the desugared expression starts at the start of the doc
                 desugaredDocument,
                 desugaredStoryFormatState,
-                { isAssignmentContext: isSetterContext, extractScriptSymbols },
+                {
+                    isAssignmentContext: isSetterContext,
+                    extractScriptSymbols: extractTwineScriptSymbols,
+                },
             ),
         // Adjust semantic token locations and (if needed) text
         (t) => {
@@ -455,7 +418,9 @@ export function tokenizeTwineScriptExpression(
         }
 
         v.location = createLocationFor(
-            v.contents,
+            "sigilOutsideRange" in v && v.sigilOutsideRange
+                ? v.contents.slice(1)
+                : v.contents,
             offset + sugaredPosition,
             textDocument,
         );
@@ -463,15 +428,14 @@ export function tokenizeTwineScriptExpression(
 
     resugarShapeSources(jsTokens, desugared, positionMapping);
 
-    // In TwineScript only sigiled names (and `settings` and `setup`) are story
-    // variables; other bare identifiers are plain JavaScript
-    const isStoryRoot = (name: string) =>
-        /^[$_]/.test(name) || name === "settings" || name === "setup";
+    // Other bare names are plain JavaScript, not story variables (ADR-0006)
     jsTokens.variables = jsTokens.variables.filter((v) =>
-        isStoryRoot(v.contents),
+        startIsVarRegexp.test(v.contents),
     );
     jsTokens.properties = jsTokens.properties.filter(
-        (p) => p.prefix !== undefined && isStoryRoot(p.prefix.split(".")[0]),
+        (p) =>
+            p.prefix !== undefined &&
+            startIsVarRegexp.test(`${p.prefix}.${p.contents}`),
     );
 
     // Adjust diagnostic location

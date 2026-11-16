@@ -509,6 +509,54 @@ describe("SugarCube Parser", () => {
 
                 expect(result).to.eql(["$r"]);
             });
+
+            it("should locate a variable reached through a state root without its sigil", () => {
+                const result = referencesFor(
+                    "<<set _p to State.variables.player>>",
+                ).find((r) => r.contents === "$player");
+
+                // `player` is at 28-34 in `<<set _p to State.variables.player>>`
+                expect(result?.location.range).to.eql(
+                    Range.create(1, 28, 1, 34),
+                );
+            });
+
+            it("should locate a State.setVar key without its sigil", () => {
+                const result = referencesFor(
+                    "<<run State.setVar('$x', 5)>>",
+                ).find((r) => r.contents === "$x");
+
+                expect(result?.location.range).to.eql(
+                    Range.create(1, 21, 1, 22),
+                );
+            });
+
+            it("should record a copy through variables() as a shape source", () => {
+                const result = referencesFor(
+                    "<<set $x to variables().y>>",
+                ).find((r) => r.contents === "$x");
+
+                expect(result?.shapeSources).to.eql(["$y"]);
+                expect(result?.opaque).to.not.be.true;
+            });
+
+            it("should record a copy through State.getVar as a shape source", () => {
+                const result = referencesFor(
+                    "<<set $x to State.getVar('_y')>>",
+                ).find((r) => r.contents === "$x");
+
+                expect(result?.shapeSources).to.eql(["_y"]);
+                expect(result?.opaque).to.not.be.true;
+            });
+
+            it("should record a copy through SugarCube.State as a shape source", () => {
+                const result = referencesFor(
+                    "<<set $x to SugarCube.State.variables.y>>",
+                ).find((r) => r.contents === "$x");
+
+                expect(result?.shapeSources).to.eql(["$y"]);
+                expect(result?.opaque).to.not.be.true;
+            });
         });
 
         it("should capture an assignment in a <<print>> macro as a property read", () => {

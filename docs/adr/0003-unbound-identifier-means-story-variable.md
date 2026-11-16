@@ -1,6 +1,7 @@
 # An identifier unbound within its snippet is a story variable
 
 Status: accepted for expression code; superseded by ADR-0005 for script code
+and by ADR-0006 for SugarCube TwineScript
 
 Twine story formats give authors variables that live in engine state, but in the
 JavaScript embedded in a passage those are just bare identifiers — there is no

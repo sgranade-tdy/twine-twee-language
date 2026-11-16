@@ -52,9 +52,11 @@ JavaScript that belong to the _story_, so they can be indexed, cross-referenced
 and renamed.
 
 **Story variable**: a name that holds story state the author controls. How a
-story variable is spelled depends on the code it appears in. In expression code
-(macro arguments, vars sections), a name unbound within the snippet is a story
-variable; see ADR-0003. In script code (Story JavaScript, `script` passages,
+story variable is spelled depends on the code it appears in. In Chapbook
+expression code (vars sections, inserts), a name unbound within the snippet is a
+story variable; see ADR-0003. In SugarCube TwineScript (macro arguments, `<<set>>`,
+`<<run>>`), a story variable is a sigiled name or is reached through a state
+root; see ADR-0006. In script code (Story JavaScript, `script` passages,
 script blocks, story script files, included scripts), a story variable is
 reached only through the format's state API (SugarCube `State.variables.x`,
 Chapbook `engine.state.get('x')`). The one exception is Chapbook, where a bare
@@ -73,7 +75,7 @@ root-level declaration in Story JavaScript binds it. Whether it counts can chang
 when other files change, without the name itself changing. _Avoid_: "candidate".
 
 **State root**: an expression the story format provides that reaches story state
-from script code: SugarCube `State.variables`, `State.temporary`, `variables()`,
+from script code or SugarCube TwineScript: SugarCube `State.variables`, `State.temporary`, `variables()`,
 `temporary()`, `SugarCube.State.*`, `getVar`/`setVar`, and Chapbook
 `engine.state`. A binding that is initialized to a state root and never
 reassigned is also a state root. _Avoid_: "accessor", "prefix".

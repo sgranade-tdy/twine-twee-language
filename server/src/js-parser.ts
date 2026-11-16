@@ -139,14 +139,16 @@ export interface ScriptVariableOccurrence extends ValueShape {
 export interface ScriptPropertyOccurrence extends ValueShape {
     text: string;
     at: number;
-    scope?: string;
+    scope: string;
     assigned: boolean;
     isCallee: boolean;
 }
 
 /**
- * Format-specific extraction of story variables and properties from script code,
- * used in place of the default "unbound means story variable" rule (ADR-0005).
+ * Format-specific extraction of story variables and properties, used in place
+ * of the default "unbound means story variable" rule. Script code reaches story
+ * variables through state roots (ADR-0005); SugarCube's TwineScript combines
+ * sigiled names with state roots (ADR-0006).
  */
 export type ScriptSymbolExtractor = (context: {
     ast: acorn.Node;
@@ -419,7 +421,7 @@ export type StaticPathOf = (node: acorn.AnyNode) => string | undefined;
  * @param isGlobalName Global-name predicate.
  * @returns The path getter.
  */
-function storyPathOf(isGlobalName: IsGlobalName): StaticPathOf {
+export function storyPathOf(isGlobalName: IsGlobalName): StaticPathOf {
     return (node) => {
         const expr = node.type === "ChainExpression" ? node.expression : node;
         const root: ScopedIdentifier | undefined =
@@ -1422,17 +1424,6 @@ function computeSemanticTokens(
 }
 
 /**
- * A property occurrence found while extracting symbols, before it's turned into a `JSPropertyLabel`.
- */
-interface RawPropertyOccurrence extends ValueShape {
-    text: string;
-    at: number;
-    scope?: string;
-    assigned: boolean;
-    isCallee: boolean;
-}
-
-/**
  * Extract story-variable and story-property occurrences from a parsed JavaScript
  * program or expression.
  *
@@ -1443,21 +1434,24 @@ interface RawPropertyOccurrence extends ValueShape {
  * @param ast Parsed text, already annotated by `annotateVariableScopes`.
  * @param isGlobalName Global-name predicate.
  * @param isAssignmentContext True if write-shaped syntax counts as an assignment.
+ * @param options Extraction options.
+ * @param options.pathOf Gets an expression's story path, to find shape sources.
+ * Defaults to the path of an unbound, non-global root.
  * @returns Variable and property occurrences, in ascending order of position.
  */
 export function extractSymbols(
     ast: acorn.Node,
     isGlobalName: IsGlobalName,
     isAssignmentContext: boolean,
+    { pathOf = storyPathOf(isGlobalName) }: { pathOf?: StaticPathOf } = {},
 ): {
     variables: ScriptVariableOccurrence[];
-    properties: RawPropertyOccurrence[];
+    properties: ScriptPropertyOccurrence[];
 } {
     // Keyed by position so that, when converted to an array below, occurrences
     // come out in ascending source position order
     const variableTokens: Record<number, ScriptVariableOccurrence> = {};
-    const propertyTokens: Record<number, RawPropertyOccurrence> = {};
-    const pathOf = storyPathOf(isGlobalName);
+    const propertyTokens: Record<number, ScriptPropertyOccurrence> = {};
 
     // Helper function to add a variable occurrence if it's an unbound (story)
     // variable and not a global

@@ -13,5 +13,6 @@
 
 ## Comments
 
-- Resolved here: TwineScript now keeps only sigiled names (plus `settings`/`setup`) as story variables, which fixes this. Decision on the legacy rewrite: replaced by composing the SugarCube script extractor with the default one.
+- Decision (ADR-0006): the legacy rewrite is removed. TwineScript uses `extractTwineScriptSymbols`, which runs the default extractor for sigiled names alongside the SugarCube state-root extractor. Both share one path tracer, so copies through `State.variables`, `variables()`, `getVar` and `SugarCube.State` get sigiled shape sources. `resugarShapeSources` keeps only its resugaring of desugared names.
 - Unrelated but seen in the same probe: in `<<run State.variables.r = fn()>>`, the bare `fn` warns as a never-set story variable.
+- Resolved here, per ADR-0006: TwineScript keeps only sigiled names (and properties of `settings`/`setup`) and state-rooted occurrences as story variables, so a bare `fn` is no longer indexed.

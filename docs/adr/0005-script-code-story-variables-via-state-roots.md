@@ -1,6 +1,6 @@
 # In script code, story variables are reached through state roots, not by being unbound
 
-Status: accepted
+Status: accepted; ADR-0006 extends its SugarCube state roots to TwineScript
 
 ADR-0003 treats any identifier left unbound in its snippet as a story variable.
 That is right for expression code, such as SugarCube macro arguments and
