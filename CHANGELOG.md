@@ -47,6 +47,7 @@ Three big changes:
 - Deconflicted language scope names with T3LT. (issue #10)
 - Renaming or deleting files now properly updates all diagnostics.
 - SugarCube: Improved syntax highlighting of twee links.
+- Chapbook: Keys of an object literal in a vars section (`player: {hp: 3}`) now count as setting those properties, so they no longer raise never-set warnings and are found by find-references, rename and go to definition.
 - SugarCube: Fixed parsing of special variables in `<<script>>` macros.
 - SugarCube: Now includes variables and properties only assigned to in e.g. `<<set>>` macros in completions.
 - SugarCube: No longer incorrectly indexes apparent variables in non-data HTML attributes.
