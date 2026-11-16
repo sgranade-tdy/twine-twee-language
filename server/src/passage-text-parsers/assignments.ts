@@ -6,11 +6,13 @@ import { isBuiltinJSProperty } from "../js-parser";
 import { ProjectIndex } from "../project-index";
 
 /**
- * Get every location in the project that assigns a story variable.
+ * Get every location in the project that assigns a story variable or
+ * property.
  *
  * @param index Project index.
- * @param assignmentKind Story format's symbol kind for an assignment.
- * @param name Story variable's name.
+ * @param assignmentKind Story format's symbol kind for a variable or
+ *        property assignment.
+ * @param name Story variable's name, or property's full path.
  * @returns Assignment locations, or undefined if there are none.
  */
 export function getAssignmentLocations(

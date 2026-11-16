@@ -23,6 +23,7 @@ Three big changes:
 - Added Quick Fix actions for disabling diagnostics for a passage or globally.
 - You can now search for and rename passage tags the same way you can passages and variables.
 - Passage tags now auto-complete.
+- Go to definition now works on story properties (like `$player.hp` or `{player.hp}`), listing every assignment to the property.
 - Variables and properties that haven't been defined now create a warning across both story format code (Chapbook/SugarCube) and JavaScript sections.
 - Now auto-completes object properties from expressions like `var['prop'] = { prop1: 2 }`.
 - When building a story, duplicated passages are replaced by the final defined version of those passages and a warning raised.
