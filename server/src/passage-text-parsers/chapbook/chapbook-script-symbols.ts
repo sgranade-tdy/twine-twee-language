@@ -4,7 +4,7 @@ import * as acornWalk from "acorn-walk";
 import {
     isEcmaScriptGlobal,
     argumentShape,
-    objectLiteralWrites,
+    objectLiteralProperties,
     ScriptPropertyOccurrence,
     ScriptSymbolExtractor,
     ScriptVariableOccurrence,
@@ -147,7 +147,9 @@ export function createChapbookScriptExtractor({
             });
             if (assigned) {
                 properties.push(
-                    ...objectLiteralWrites(value, key.name, statePathOf),
+                    ...objectLiteralProperties(value, key.name, statePathOf, {
+                        assigned: true,
+                    }),
                 );
             }
         });
