@@ -4,8 +4,10 @@ import * as acornWalk from "acorn-walk";
 import {
     isCallee,
     argumentShape,
+    assignedValue,
     assignmentShape,
     isWriteTarget,
+    objectLiteralWrites,
     parentOf,
     ScriptPropertyOccurrence,
     ScriptSymbolExtractor,
@@ -177,6 +179,15 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
                         ? assignmentShape(node, ancestors, statePathOf)
                         : {},
                 });
+                if (written) {
+                    properties.push(
+                        ...objectLiteralWrites(
+                            assignedValue(node, ancestors),
+                            sigil + name.name,
+                            statePathOf,
+                        ),
+                    );
+                }
 
                 // Capture properties by walking up through static property accesses
                 let current: acorn.AnyNode = node;
@@ -202,6 +213,15 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
                                 : {},
                         ),
                     });
+                    if (assigned) {
+                        properties.push(
+                            ...objectLiteralWrites(
+                                assignedValue(up, upAncestors),
+                                `${scope}.${prop.name}`,
+                                statePathOf,
+                            ),
+                        );
+                    }
                     scope = `${scope}.${prop.name}`;
                     current = up;
                     depth--;
@@ -244,6 +264,15 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
                             : {},
                     },
                 );
+                if (isSet && isIdentifierName(literal.name.slice(1))) {
+                    properties.push(
+                        ...objectLiteralWrites(
+                            node.arguments[1],
+                            literal.name,
+                            statePathOf,
+                        ),
+                    );
+                }
                 break;
             }
         }
