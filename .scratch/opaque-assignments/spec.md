@@ -108,6 +108,30 @@ Rather than marking them opaque, they record a **shape source** (GLOSSARY).
   follow shape sources. After renaming `$player.hp`, a now-unbacked `_p.hp`
   starts warning, which surfaces the stale read.
 
+### Object literals written from script code
+
+An object literal assigned to story state in script code
+(`State.variables.player = {hp: 1}`, `engine.state.set('player', {hp: 1})`,
+`engine.state.setDefault(…)`) records its keys as property writes, just as
+`<<set $player to {hp: 1}>>` does. Without this, Story JavaScript that sets up
+a variable makes every later read of its properties warn.
+
+- **Nested keys**: `{stats: {str: 1}}` writes `stats` and `stats.str`.
+- **Spreads** inside the literal record shape sources, as above.
+- **Opaque values**: a key whose value is opaque (`{inv: fn()}`) makes only
+  that key's path opaque.
+- **Every script context**: story `.js` files, `<<script>>`/`<<run>>`, and
+  Chapbook `[JavaScript]`.
+
+### Chained `engine.state.get` in Chapbook
+
+Member access off a Chapbook state read counts as the path it reaches:
+`engine.state.get('player').a.b` is `player.a.b`. That applies to reads, to
+writes (`engine.state.get('player').hp = 3` sets `player.hp`), and to shape
+sources (`set('s', engine.state.get('player').stats)` copies `player.stats`).
+Indexed segments (`get('list')[0]`) and method calls stop the chain, as they do
+elsewhere.
+
 ## Rejected Alternatives
 
 - **Full type system or the TypeScript checker**: large bundle growth and a lot
@@ -135,7 +159,9 @@ Add focused cases to the existing parser and diagnostics test files. Cover:
 
 ## Out of Scope
 
-- Catalogue item 7 (indirect writes the parser doesn't count).
+- Catalogue item 7 (indirect writes the parser doesn't count), apart from the
+  two direct forms above: object literals written from script code and chained
+  `engine.state.get` writes.
 - `Object.assign`: its result is opaque, and the mutating form
   (`Object.assign($o, {k: 1})`) is an uncounted write (item 7), not an opaque
   one.
