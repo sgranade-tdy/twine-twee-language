@@ -24,7 +24,11 @@ import {
     Sigiled,
     sigilFlag,
 } from "./project-index";
-import { isIdentifierName, MISSING_IDENTIFIER } from "./script-analysis";
+import {
+    isIdentifierName,
+    MISSING_IDENTIFIER,
+    StaticName,
+} from "./script-analysis";
 import { ETokenType, TokenModifier, TokenType } from "./semantic-tokens";
 import { Label } from "./types";
 
@@ -1125,6 +1129,65 @@ export function isCallee(
             parent?.type === "CallExpression") &&
         parent.callee === node
     );
+}
+
+/**
+ * Get the properties a chain of static member accesses off a story path
+ * stands for (`a` and `b` in `$p.a.b`), stopping at the first segment that
+ * isn't static, such as an index or a call result. Each property that's
+ * written gets the shape of its value, along with any object literal keys
+ * written with it.
+ *
+ * @param start Expression that stands for the story path.
+ * @param path Story path `start` stands for.
+ * @param ancestors The start's ancestors, ending with `start` itself.
+ * @param memberName Gets a member expression's static property name.
+ * @param pathOf Gets an expression's story path, to find shape sources and
+ * recognize a self-reference.
+ * @param isSegment True if a static property name can continue the chain.
+ * @returns The chain's properties, in source order.
+ */
+export function memberChainProperties(
+    start: acorn.AnyNode,
+    path: string,
+    ancestors: acorn.Node[],
+    memberName: (node: acorn.MemberExpression) => StaticName | undefined,
+    pathOf: StaticPathOf,
+    isSegment: (name: string) => boolean = () => true,
+): ScriptPropertyOccurrence[] {
+    const properties: ScriptPropertyOccurrence[] = [];
+    let current = start;
+    for (let depth = ancestors.length - 2; depth >= 0; depth--) {
+        const up = ancestors[depth] as acorn.AnyNode;
+        if (up.type !== "MemberExpression" || up.object !== current) break;
+        const prop = memberName(up);
+        if (!prop || !isSegment(prop.name)) break;
+        const upAncestors = ancestors.slice(0, depth + 1);
+        const assigned = isWriteTarget(up, upAncestors, true);
+        properties.push({
+            text: prop.name,
+            at: prop.start,
+            scope: path,
+            assigned,
+            isCallee: isCallee(up, parentOf(upAncestors)),
+            ...shapeFlags(
+                assigned ? assignmentShape(up, upAncestors, pathOf) : {},
+            ),
+        });
+        path = `${path}.${prop.name}`;
+        if (assigned) {
+            properties.push(
+                ...objectLiteralProperties(
+                    assignedValue(up, upAncestors),
+                    path,
+                    pathOf,
+                    { assigned: true },
+                ),
+            );
+        }
+        current = up;
+    }
+    return properties;
 }
 
 /**

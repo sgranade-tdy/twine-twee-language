@@ -11,7 +11,7 @@
 - [x] Shape source: `engine.state.set('s', engine.state.get('player').stats)` with `player.stats.str` set: `{s.str}` doesn't warn and `{s.stt}` does (both silent today)
 - [x] Mixed key and chain: `engine.state.get('player.stats').str` is `player.stats.str`
 - [x] Indexed segments (`get('list')[0]`) and method calls (`get('inv').push(x)`) stop the chain, with no new warnings
-- [x] Find-references, go-to-definition and rename cover the chained property
+- [ ] ~~Find-references, go-to-definition and rename cover the chained property~~ References and rename done; go-to-definition is out of scope (see comments)
 
 ## Comments
 
