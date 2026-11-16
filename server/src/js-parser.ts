@@ -17,8 +17,8 @@ import {
 import {
     Callable,
     calleeFlag,
-    Opaque,
-    opaqueFlag,
+    ValueShape,
+    shapeFlags,
     Shorthand,
     shorthandFlag,
     Sigiled,
@@ -50,7 +50,7 @@ export type ScriptOccurrenceRole = "conditional-reference" | "root-declaration";
 /**
  * Label for a parsed javascript variable.
  */
-export interface JSVariableLabel extends Label, Sigiled, Shorthand, Opaque {
+export interface JSVariableLabel extends Label, Sigiled, Shorthand, ValueShape {
     /**
      * Set for occurrences that aren't ordinary story variables.
      */
@@ -64,7 +64,7 @@ export interface JSVariableLabel extends Label, Sigiled, Shorthand, Opaque {
 /**
  * Label for a parsed javascript property.
  */
-export interface JSPropertyLabel extends Label, Opaque {
+export interface JSPropertyLabel extends Label, ValueShape {
     /**
      * The property's prefix, if known. A reference for `subprop` from `var.prop.subprop` will
      * have a prefix of `var.prop`.
@@ -115,7 +115,7 @@ export interface JSDiagnostic {
 /**
  * A story-variable occurrence found by a format-specific script extractor.
  */
-export interface ScriptVariableOccurrence extends Opaque {
+export interface ScriptVariableOccurrence extends ValueShape {
     /** The variable's name, including any sigil. */
     text: string;
     /** The text the occurrence's range covers, if it differs from `text` (e.g. it excludes the sigil). */
@@ -132,7 +132,7 @@ export interface ScriptVariableOccurrence extends Opaque {
 /**
  * A story-property occurrence found by a format-specific script extractor.
  */
-export interface ScriptPropertyOccurrence extends Opaque {
+export interface ScriptPropertyOccurrence extends ValueShape {
     text: string;
     at: number;
     scope: string;
@@ -434,9 +434,9 @@ function storyPathOf(isGlobalName: IsGlobalName): StaticPathOf {
 }
 
 /** Value of known shape: it's neither opaque nor has shape sources. */
-const knownShape: Opaque = {};
+const knownShape: ValueShape = {};
 /** Value of unknown shape. */
-const opaqueShape: Opaque = { opaque: true };
+const opaqueShape: ValueShape = { opaque: true };
 
 /**
  * Combine the shapes of a value's possible parts or branches. Opaque wins;
@@ -445,7 +445,7 @@ const opaqueShape: Opaque = { opaque: true };
  * @param shapes Shapes to combine.
  * @returns Combined shape.
  */
-function combineShapes(shapes: Opaque[]): Opaque {
+function combineShapes(shapes: ValueShape[]): ValueShape {
     if (shapes.some((s) => s.opaque)) return opaqueShape;
     const sources = [...new Set(shapes.flatMap((s) => s.shapeSources ?? []))];
     return sources.length > 0 ? { shapeSources: sources } : knownShape;
@@ -488,19 +488,19 @@ function copiedPath(
  * compare with `selfPath`.
  * @returns The value's shape.
  */
-export function valueShape(
+export function shapeOfValue(
     value: acorn.AnyNode,
     selfPath: string | undefined,
     pathOf: StaticPathOf,
-): Opaque {
+): ValueShape {
     if (selfPath !== undefined && pathOf(value) === selfPath) return knownShape;
     // A copy of the assigned path itself contributes nothing
-    const copyShape = (source: string): Opaque =>
+    const copyShape = (source: string): ValueShape =>
         source === selfPath ? knownShape : { shapeSources: [source] };
     const source = copiedPath(value, pathOf);
     if (source !== undefined) return copyShape(source);
     const shapeOf = (branch: acorn.AnyNode) =>
-        valueShape(branch, selfPath, pathOf);
+        shapeOfValue(branch, selfPath, pathOf);
     switch (value.type) {
         case "ChainExpression":
             return shapeOf(value.expression);
@@ -629,14 +629,14 @@ export function assignmentShape(
     target: acorn.AnyNode,
     ancestors: acorn.Node[],
     pathOf: StaticPathOf,
-): Opaque {
+): ValueShape {
     const value = assignedValue(target, ancestors);
     if (value !== undefined) {
-        return valueShape(value, pathOf(target), pathOf);
+        return shapeOfValue(value, pathOf(target), pathOf);
     }
     const source = destructuredSource(target, ancestors);
     if (source === undefined) return knownShape;
-    const shape = valueShape(source, undefined, pathOf);
+    const shape = shapeOfValue(source, undefined, pathOf);
     return shape.opaque || shape.shapeSources ? opaqueShape : knownShape;
 }
 
@@ -1081,7 +1081,7 @@ function captureObjectExpressionProperties(
         scope?: string,
         assigned?: boolean,
         isCallee?: boolean,
-        shape?: Opaque,
+        shape?: ValueShape,
     ) => void,
 ) {
     const isGlobalObject = isGlobalObjectScope(parentScope, isGlobalName);
@@ -1107,7 +1107,7 @@ function captureObjectExpressionProperties(
             assigned,
             false,
             assigned
-                ? valueShape(prop.value, newScope, storyPathOf(isGlobalName))
+                ? shapeOfValue(prop.value, newScope, storyPathOf(isGlobalName))
                 : knownShape,
         );
 
@@ -1376,7 +1376,7 @@ function computeSemanticTokens(
 /**
  * A property occurrence found while extracting symbols, before it's turned into a `JSPropertyLabel`.
  */
-interface RawPropertyOccurrence extends Opaque {
+interface RawPropertyOccurrence extends ValueShape {
     text: string;
     at: number;
     scope?: string;
@@ -1420,7 +1420,7 @@ function extractSymbols(
             text: id.name,
             at: id.start,
             assigned: !!id._isAssignment,
-            ...opaqueFlag(shape),
+            ...shapeFlags(shape),
         };
     };
 
@@ -1442,7 +1442,7 @@ function extractSymbols(
             scope,
             assigned,
             isCallee,
-            ...opaqueFlag(shape),
+            ...shapeFlags(shape),
         };
     };
 
@@ -1709,10 +1709,10 @@ export function argumentShape(
     arg: acorn.AnyNode | undefined,
     selfPath: string,
     pathOf: StaticPathOf,
-): Opaque {
+): ValueShape {
     return arg === undefined || arg.type === "SpreadElement"
         ? knownShape
-        : valueShape(arg, selfPath, pathOf);
+        : shapeOfValue(arg, selfPath, pathOf);
 }
 
 /**
@@ -1729,9 +1729,9 @@ export function valueTextShape(
     text: string,
     selfPath: string,
     hostGlobals?: ReadonlySet<string>,
-): Opaque {
+): ValueShape {
     try {
-        return valueShape(
+        return shapeOfValue(
             parseJSStrict(text, false) as acorn.AnyNode,
             selfPath,
             storyPathOf(globalNamePredicate(hostGlobals)),
@@ -1887,7 +1887,7 @@ export function tokenizeJavaScript(
                 ...sigilFlag(variable),
                 ...shorthandFlag(variable),
                 ...(variable.role ? { role: variable.role } : {}),
-                ...opaqueFlag(variable),
+                ...shapeFlags(variable),
             });
         }
         for (const property of properties) {
@@ -1901,7 +1901,7 @@ export function tokenizeJavaScript(
                 prefix: property.scope,
                 assigned: property.assigned,
                 ...calleeFlag(property),
-                ...opaqueFlag(property),
+                ...shapeFlags(property),
             });
         }
     }

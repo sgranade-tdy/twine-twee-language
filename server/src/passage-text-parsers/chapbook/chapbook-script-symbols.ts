@@ -8,7 +8,7 @@ import {
     ScriptSymbolExtractor,
     ScriptVariableOccurrence,
 } from "../../js-parser";
-import { opaqueFlag } from "../../project-index";
+import { shapeFlags } from "../../project-index";
 import { browserGlobals } from "../host-globals";
 import {
     createScriptAnalysis,
@@ -132,7 +132,7 @@ export function createChapbookScriptExtractor({
                 : {};
             let at = key.start;
             segments.forEach((segment, i) => {
-                const flag = opaqueFlag(i === segments.length - 1 ? shape : {});
+                const flag = shapeFlags(i === segments.length - 1 ? shape : {});
                 if (i === 0) {
                     variables.push({ text: segment, at, assigned, ...flag });
                 } else {

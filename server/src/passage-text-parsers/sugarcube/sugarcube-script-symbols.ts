@@ -11,7 +11,7 @@ import {
     ScriptSymbolExtractor,
     ScriptVariableOccurrence,
 } from "../../js-parser";
-import { Opaque, opaqueFlag, shorthandFlag } from "../../project-index";
+import { ValueShape, shapeFlags, shorthandFlag } from "../../project-index";
 import {
     createScriptAnalysis,
     isIdentifierName,
@@ -147,7 +147,7 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
             assigned,
             shorthand = false,
             shape = {},
-        }: { assigned: boolean; shorthand?: boolean; shape?: Opaque },
+        }: { assigned: boolean; shorthand?: boolean; shape?: ValueShape },
     ) => {
         if (!isIdentifierName(name.name)) return;
         variables.push({
@@ -157,7 +157,7 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
             assigned,
             sigilOutsideRange: true,
             ...shorthandFlag({ shorthand }),
-            ...opaqueFlag(shape),
+            ...shapeFlags(shape),
         });
     };
 
@@ -196,7 +196,7 @@ export const extractSugarCubeScriptSymbols: ScriptSymbolExtractor = ({
                         scope,
                         assigned,
                         isCallee: isCallee(up, parentOf(upAncestors)),
-                        ...opaqueFlag(
+                        ...shapeFlags(
                             assigned
                                 ? assignmentShape(up, upAncestors, statePathOf)
                                 : {},

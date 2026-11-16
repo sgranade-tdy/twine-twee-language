@@ -29,8 +29,8 @@ import {
 import { ParseLevel } from "../../parser-types";
 import {
     calleeFlag,
-    Opaque,
-    opaqueFlag,
+    ValueShape,
+    shapeFlags,
     ProjectIndex,
 } from "../../project-index";
 import { ETokenType, ETokenModifier } from "../../semantic-tokens";
@@ -110,14 +110,14 @@ export function getChapbookDefinitions(
 function setPathShape(
     jsTokens: TokenizedJS,
     path: string,
-    shape: Opaque,
+    shape: ValueShape,
 ): void {
     for (const v of jsTokens.variables) {
-        if (v.contents === path) Object.assign(v, opaqueFlag(shape));
+        if (v.contents === path) Object.assign(v, shapeFlags(shape));
     }
     for (const p of jsTokens.properties) {
         if (`${p.prefix}.${p.contents}` === path) {
-            Object.assign(p, opaqueFlag(shape));
+            Object.assign(p, shapeFlags(shape));
         }
     }
 }
@@ -151,7 +151,7 @@ function createVariableAndPropertyReferences(
             contents: v.contents,
             location: v.location,
             kind,
-            ...opaqueFlag(v),
+            ...shapeFlags(v),
         });
     }
     for (const p of jsTokens.properties) {
@@ -167,7 +167,7 @@ function createVariableAndPropertyReferences(
                     ? OChapbookSymbolKind.PropertySet
                     : OChapbookSymbolKind.Property,
             ...calleeFlag(p),
-            ...opaqueFlag(p),
+            ...shapeFlags(p),
         });
     }
     if (jsTokens.error) {

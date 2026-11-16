@@ -82,11 +82,11 @@ export function shorthandFlag(source: Shorthand): Shorthand {
 }
 
 /**
- * Tracks an assignment's value shape: whether it's an opaque assignment (one
- * whose value could be an object of unknown shape), and, if it copies story
- * state, its shape sources.
+ * What's known about the shape of an assigned value. Two separate ideas:
+ * whether it's an opaque assignment (one whose value could be an object of
+ * unknown shape), and its shape sources (story paths whose shape it copies).
  */
-export interface Opaque {
+export interface ValueShape {
     /**
      * True if the occurrence is an opaque assignment, so story properties
      * beneath its path are never reported as never set.
@@ -102,13 +102,14 @@ export interface Opaque {
 
 /**
  * Spread-ready `opaque` flag and shape sources that are absent unless set,
- * keeping indexed shapes sparse.
+ * keeping indexed shapes sparse. Shape sources are sorted and deduped so
+ * equal shapes compare equal.
  */
-export function opaqueFlag(source: Opaque): Opaque {
+export function shapeFlags(source: ValueShape): ValueShape {
     return {
         ...(source.opaque ? { opaque: true } : {}),
         ...(source.shapeSources?.length
-            ? { shapeSources: source.shapeSources }
+            ? { shapeSources: [...new Set(source.shapeSources)].sort() }
             : {}),
     };
 }
@@ -117,7 +118,7 @@ export function opaqueFlag(source: Opaque): Opaque {
  * A label with a number that identifies the kind of label it is.
  */
 export interface ProjSymbol
-    extends Label, Kind, Callable, Sigiled, Shorthand, Opaque {}
+    extends Label, Kind, Callable, Sigiled, Shorthand, ValueShape {}
 
 /**
  * Kind of a Twine symbol.
@@ -131,7 +132,8 @@ export enum TwineSymbolKind {
 /**
  * References, which have contents, locations, and an identifier for its kind.
  */
-export interface References extends Kind, Callable, Sigiled, Shorthand, Opaque {
+export interface References
+    extends Kind, Callable, Sigiled, Shorthand, ValueShape {
     contents: string;
     locations: Location[];
 }
