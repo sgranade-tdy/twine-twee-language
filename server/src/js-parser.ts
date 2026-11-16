@@ -184,6 +184,17 @@ export function markAllWritten(
 }
 
 /**
+ * Mark every write in tokenized JavaScript as opaque.
+ *
+ * @param tokens Tokenized JavaScript to mark in place.
+ */
+export function markWritesOpaque(tokens: TokenizedJS): void {
+    for (const label of [...tokens.variables, ...tokens.properties]) {
+        if (label.assigned) label.opaque = true;
+    }
+}
+
+/**
  * JavaScript global names.
  *
  * Note that browser and library globals come from story formats,

@@ -126,8 +126,11 @@ global or story-format built-in, which are bare names, not properties.
 `$x.y = 1`), as evidence that the story variable gets set. Twine variables are
 never declared, so this is the only creation signal the parser has. Three things
 count: write-shaped syntax inside an **assignment context**, and occurrences a
-story format forces to be writes (the Chapbook vars section, SugarCube receivers,
-`setVar`, `engine.state.set`). A write the parser doesn't count,
+story format forces to be writes (the Chapbook vars section, quoted SugarCube
+receivers, `setVar`, `engine.state.set`). A quoted receiver (`"$p.stats"`)
+writes its target path; its other names, like `_i` in `"$a[_i]"`, are reads. A
+back-ticked or bare receiver names its target at runtime (`` `$target` `` holds
+the name), so it records only reads. A write the parser doesn't count,
 such as `<<print $x = 1>>`, is a read. _Avoid_: "definition", which implies a
 declaration site that Twine JavaScript doesn't have.
 
@@ -149,14 +152,14 @@ prefix renames the wrong thing.
 
 **Opaque assignment**: an assignment whose value could be an object of unknown
 shape — a call, `new`, a member access or identifier that isn't a story
-variable, `this`, a `for…range` value, a SugarCube receiver, or a
-conditional/logical expression with any such branch. It marks the assigned path
-as **opaque**: never-set warnings are suppressed for every story property beneath
-it, project-wide, even if a literal assignment elsewhere gives the path a known
-shape. Literals, arithmetic, comparisons and string building are not opaque, so
-`$x.foo` after `$x = 5` still warns. A branch that is the assigned path itself
-(`$inv = $inv || {}`) is ignored. _Avoid_: "untyped", "any", which imply a type
-system the parser doesn't have.
+variable, `this`, a `for…range` value, a quoted SugarCube receiver's target
+path, or a conditional/logical expression with any such branch. It marks the
+assigned path as **opaque**: never-set warnings are suppressed for every story
+property beneath it, project-wide, even if a literal assignment elsewhere gives
+the path a known shape. Literals, arithmetic, comparisons and string building
+are not opaque, so `$x.foo` after `$x = 5` still warns. A branch that is the
+assigned path itself (`$inv = $inv || {}`) is ignored. _Avoid_: "untyped",
+"any", which imply a type system the parser doesn't have.
 
 **Shape source**: a story variable or property whose shape another path copies,
 by plain assignment (`_p = $player`), `clone()`, or object spread

@@ -419,6 +419,15 @@ describe("Validator", () => {
             expect(result).to.eql(["x"]);
         });
 
+        it("should warn on a property of a variable used as a back-ticked receiver", async () => {
+            const result = await neverSetIn(
+                '<<set $target to "$name">><<textbox `$target` "">>',
+                "<<print $target.x>>",
+            );
+
+            expect(result).to.eql(["x"]);
+        });
+
         for (const setText of [
             `<<checkbox "$r" false true>>`,
             `<<cycle "$r">><<option "a">><</cycle>>`,
@@ -427,7 +436,6 @@ describe("Validator", () => {
             `<<radiobutton "$r" 1>>`,
             `<<textarea "$r" "">>`,
             `<<textbox "$r" "">>`,
-            '<<textbox `$r` "">>',
         ]) {
             it(`should not warn on a property of the receiver in ${setText}`, async () => {
                 const result = await neverSetIn(setText, "<<print $r.x>>");

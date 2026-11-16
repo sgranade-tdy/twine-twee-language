@@ -3438,7 +3438,7 @@ describe("SugarCube Parser", () => {
                 ]);
             });
 
-            it("should capture set variables for receiver values in backticks", () => {
+            it("should capture variable reads for receiver values in backticks", () => {
                 const header = ":: Passage\n";
                 const passage = "Let's go: <<a bare `$testy`>>\n";
                 const callbacks = new MockCallbacks();
@@ -3469,10 +3469,73 @@ describe("SugarCube Parser", () => {
                             "fake-uri",
                             Range.create(1, 20, 1, 26),
                         ),
-                        kind: OSugarCubeSymbolKind.VariableSet,
-                        opaque: true,
+                        kind: OSugarCubeSymbolKind.Variable,
                     },
                 ]);
+            });
+
+            it("should capture only variable reads for a computed receiver in backticks", () => {
+                const header = ":: Passage\n";
+                const passage = "Let's go: <<a bare `$a[_i]`>>\n";
+                const callbacks = new MockCallbacks();
+                const state = buildParsingState({
+                    content: header + passage,
+                    callbacks: callbacks,
+                });
+                const macro = buildMacroInfoWithArgs({
+                    name: "a",
+                    args: ["bareword &+ receiver"],
+                });
+                const parser = uut.getSugarCubeParser(undefined, {
+                    allMacros: () => {
+                        return { a: macro };
+                    },
+                    allMacroEnums: () => {
+                        return {};
+                    },
+                });
+
+                parser?.parsePassageText(passage, header.length, state);
+                const results = callbacks.references
+                    .slice(1)
+                    .map((r) => [r.contents, r.kind, r.opaque]);
+
+                expect(results).to.eql([
+                    ["$a", OSugarCubeSymbolKind.Variable, undefined],
+                    ["_i", OSugarCubeSymbolKind.Variable, undefined],
+                ]);
+            });
+
+            it("should capture nothing for a quoted receiver that isn't an assignment target", () => {
+                const header = ":: Passage\n";
+                const passage = "Let's go: <<a bare '$junk + 1'>>\n";
+                const callbacks = new MockCallbacks();
+                const state = buildParsingState({
+                    content: header + passage,
+                    callbacks: callbacks,
+                });
+                const macro = buildMacroInfoWithArgs({
+                    name: "a",
+                    args: ["bareword &+ receiver"],
+                });
+                const parser = uut.getSugarCubeParser(undefined, {
+                    allMacros: () => {
+                        return { a: macro };
+                    },
+                    allMacroEnums: () => {
+                        return {};
+                    },
+                });
+
+                parser?.parsePassageText(passage, header.length, state);
+                const references = callbacks.references.slice(1);
+                const receiverTokens = callbacks.tokens.filter(
+                    (t) => t.char >= 19,
+                );
+
+                expect(references).to.be.empty;
+                expect(receiverTokens).to.be.empty;
+                expect(callbacks.errors).to.be.empty;
             });
         });
     });
