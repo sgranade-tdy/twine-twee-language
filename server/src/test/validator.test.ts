@@ -330,7 +330,11 @@ describe("Validator", () => {
         });
 
         for (const [desc, setText, readText] of [
-            ["an alias", "<<set _p to $player>>", "<<print _p.hp>>"],
+            [
+                "a copy of a story variable",
+                "<<set _p to $player>>",
+                "<<print _p.hp>>",
+            ],
             [
                 "member access",
                 "<<set $x to setup.items.sword>>",

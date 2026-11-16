@@ -398,6 +398,7 @@ function isOpaqueValue(value: acorn.AnyNode, selfPath?: string): boolean {
         case "MemberExpression":
             return selfPath === undefined || staticPathOf(value) !== selfPath;
         case "CallExpression":
+        case "TaggedTemplateExpression":
         case "NewExpression":
         case "ThisExpression":
         case "AwaitExpression":
@@ -415,6 +416,16 @@ function isOpaqueValue(value: acorn.AnyNode, selfPath?: string): boolean {
             );
         case "ObjectExpression":
             return value.properties.some((p) => p.type === "SpreadElement");
+        case "AssignmentExpression":
+            // `x = y = fn()` gives `x` the value of `fn()`
+            return (
+                value.operator === "=" && isOpaqueValue(value.right, selfPath)
+            );
+        case "SequenceExpression":
+            return isOpaqueValue(
+                value.expressions[value.expressions.length - 1],
+                selfPath,
+            );
         default:
             return false;
     }

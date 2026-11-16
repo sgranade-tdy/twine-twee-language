@@ -3019,16 +3019,9 @@ describe("JS Parser", () => {
             ["this", "function f() { x = this }"],
             ["an await expression", "async function f() { x = await p }"],
             ["a yield expression", "function* f() { x = yield 1 }"],
-        ]) {
-            it(`should mark a variable assigned ${desc} as opaque`, () => {
-                const result = tokenize(code, true);
-
-                expect(result.variables.find((v) => v.contents === "x")?.opaque)
-                    .to.be.true;
-            });
-        }
-
-        for (const [desc, code] of [
+            ["a tagged template", "x = tag`a`"],
+            ["a chained assignment of an opaque value", "x = y = fn()"],
+            ["a sequence ending in an opaque value", "x = (1, fn())"],
             ["a conditional with an opaque branch", "x = c ? fn() : 1"],
             ["an || with an opaque operand", "x = 1 || y"],
             ["a ?? with an opaque operand", "x = y ?? {}"],
