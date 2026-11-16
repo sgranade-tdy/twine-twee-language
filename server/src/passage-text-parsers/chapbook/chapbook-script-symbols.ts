@@ -3,15 +3,18 @@ import * as acornWalk from "acorn-walk";
 
 import {
     isEcmaScriptGlobal,
+    isOpaqueArgument,
     ScriptPropertyOccurrence,
     ScriptSymbolExtractor,
     ScriptVariableOccurrence,
 } from "../../js-parser";
+import { opaqueFlag } from "../../project-index";
 import { browserGlobals } from "../host-globals";
 import {
     createScriptAnalysis,
     isIdentifierName,
     MISSING_IDENTIFIER,
+    StaticName,
 } from "../../script-analysis";
 
 /**
@@ -43,7 +46,8 @@ const storyVariableNames: ReadonlySet<string> = new Set(["config"]);
  *
  * `engine.state.get`/`set`/`setDefault` with a literal key (or a
  * never-reassigned alias of `engine.state`) yield story variables and
- * properties. An unbound bare `config` is a story variable, and every other
+ * properties. A `set`/`setDefault` whose value could be an object of unknown
+ * shape marks its path opaque. An unbound bare `config` is a story variable, and every other
  * unbound bare name yields a conditional reference, which is never an
  * assignment. Escaped spellings (`g\u006Fld`) yield nothing. Declarations
  * are never story variables.
@@ -80,28 +84,59 @@ export function createChapbookScriptExtractor({
             );
         };
 
-        acornWalk.full(ast, (rawNode) => {
-            const node = rawNode as acorn.AnyNode;
+        // `engine.state.get`/`set`/`setDefault` call with a literal key
+        const engineStateCall = (
+            node: acorn.AnyNode,
+        ):
+            | { method: "get" | "set" | "setDefault"; key: StaticName }
+            | undefined => {
             if (
                 node.type !== "CallExpression" ||
                 node.callee.type !== "MemberExpression" ||
                 !isEngineState(node.callee.object)
             )
-                return;
+                return undefined;
             const method = memberName(node.callee)?.name;
             if (method !== "get" && method !== "set" && method !== "setDefault")
-                return;
+                return undefined;
             const key =
                 node.arguments[0] && staticKeyName(node.arguments[0], true);
-            if (!key) return;
+            return key ? { method, key } : undefined;
+        };
+
+        // Key of an `engine.state.get` call, so a self-reference like
+        // `set('inv', get('inv') || {})` is ignored
+        const statePathOf = (node: acorn.AnyNode): string | undefined => {
+            if (node.type === "ChainExpression") {
+                return statePathOf(node.expression);
+            }
+            const call = engineStateCall(node);
+            return call?.method === "get" ? call.key.name : undefined;
+        };
+
+        acornWalk.full(ast, (rawNode) => {
+            const node = rawNode as acorn.AnyNode;
+            const call = engineStateCall(node);
+            if (!call) return;
+            const { method, key } = call;
             const segments = key.name.split(".");
             if (!segments.every((s) => isIdentifierName(s))) return;
 
             const assigned = method !== "get";
+            const opaque =
+                assigned &&
+                isOpaqueArgument(
+                    (node as acorn.CallExpression).arguments[1],
+                    key.name,
+                    statePathOf,
+                );
             let at = key.start;
             segments.forEach((segment, i) => {
+                const flag = opaqueFlag({
+                    opaque: opaque && i === segments.length - 1,
+                });
                 if (i === 0) {
-                    variables.push({ text: segment, at, assigned });
+                    variables.push({ text: segment, at, assigned, ...flag });
                 } else {
                     properties.push({
                         text: segment,
@@ -109,6 +144,7 @@ export function createChapbookScriptExtractor({
                         scope: segments.slice(0, i).join("."),
                         assigned,
                         isCallee: false,
+                        ...flag,
                     });
                 }
                 at += segment.length + 1;

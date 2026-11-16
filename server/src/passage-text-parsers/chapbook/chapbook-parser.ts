@@ -9,6 +9,7 @@ import type { AcornSyntaxError } from "../../acorn-errors";
 import { createDiagnosticFor } from "../../diagnostics";
 import { EmbeddedDocument } from "../../embedded-languages";
 import {
+    isOpaqueValueText,
     markAllWritten,
     parseJSStrict,
     TokenizedJS,
@@ -92,6 +93,21 @@ export function getChapbookDefinitions(
         .filter<ChapbookSymbol>((x): x is ChapbookSymbol =>
             ChapbookSymbol.is(x),
         );
+}
+
+/**
+ * Mark the variable or property with a given path opaque.
+ *
+ * @param jsTokens Tokenized variables and properties to mark in place.
+ * @param path Full dotted path to mark.
+ */
+function markPathOpaque(jsTokens: TokenizedJS, path: string): void {
+    for (const v of jsTokens.variables) {
+        if (v.contents === path) v.opaque = true;
+    }
+    for (const p of jsTokens.properties) {
+        if (`${p.prefix}.${p.contents}` === path) p.opaque = true;
+    }
 }
 
 /**
@@ -2269,19 +2285,24 @@ function parseVarsSection(
 
         logShadowedVariableDiagnostic(name, sectionIndex + nameIndex, state);
 
+        const [value, valueIndex] = skipSpaces(
+            m[2].slice(colonIndex + 1),
+            m.index + m[1].length + colonIndex + 1,
+        );
+
         // Capture the variable name reference as being set by this vars section
         // and update the token for the name to show that it's being modified.
-        createVariableAndPropertyReferences(
-            tokenizeJavaScript(
-                false,
-                name,
-                sectionIndex + nameIndex,
-                state.textDocument,
-                chapbookState,
-            ),
-            state,
-            true,
+        const nameTokens = tokenizeJavaScript(
+            false,
+            name,
+            sectionIndex + nameIndex,
+            state.textDocument,
+            chapbookState,
         );
+        if (isOpaqueValueText(value, name)) {
+            markPathOpaque(nameTokens, name);
+        }
+        createVariableAndPropertyReferences(nameTokens, state, true);
         // Capture tokens for variables and properties
         const varsAndProps = name.split(".");
         for (let i = 0, ndx = nameIndex; i < varsAndProps.length; ++i) {
@@ -2296,10 +2317,6 @@ function parseVarsSection(
         }
 
         // Handle the value
-        const [value, valueIndex] = skipSpaces(
-            m[2].slice(colonIndex + 1),
-            m.index + m[1].length + colonIndex + 1,
-        );
         createVariableAndPropertyReferences(
             tokenizeJavaScript(
                 false,

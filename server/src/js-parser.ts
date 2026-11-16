@@ -1595,6 +1595,46 @@ export function parseJSStrict(
 }
 
 /**
+ * Is a format-forced write (`setVar('$x', …)`, `engine.state.set('x', …)`)
+ * an opaque assignment, judged by its value argument?
+ *
+ * @param arg Value argument, if any.
+ * @param selfPath Path being assigned.
+ * @param pathOf Gets an expression's path, to recognize a self-reference.
+ * @returns True if the argument could be an object of unknown shape.
+ */
+export function isOpaqueArgument(
+    arg: acorn.AnyNode | undefined,
+    selfPath: string,
+    pathOf: StaticPathOf,
+): boolean {
+    return (
+        arg !== undefined &&
+        arg.type !== "SpreadElement" &&
+        isOpaqueValue(arg, selfPath, pathOf)
+    );
+}
+
+/**
+ * Could the value of an expression's text be an object of unknown shape?
+ *
+ * @param text Text of the expression being assigned.
+ * @param selfPath Path being assigned, whose self-reference is ignored.
+ * @returns True if assigning the value is an opaque assignment, or false
+ * if the text doesn't parse.
+ */
+export function isOpaqueValueText(text: string, selfPath: string): boolean {
+    try {
+        return isOpaqueValue(
+            parseJSStrict(text, false) as acorn.AnyNode,
+            selfPath,
+        );
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Parse a JavaScript program or expression.
  *
  * This performs strict parsing, then loose parsing, and does not throw an exception.
