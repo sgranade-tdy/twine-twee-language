@@ -33,6 +33,12 @@ function extract(text: string) {
             !!v.sigilOutsideRange,
         ]),
         props: result.properties.map((p) => [p.prefix, p.contents]),
+        opaque: [
+            ...result.variables.filter((v) => v.opaque).map((v) => v.contents),
+            ...result.properties
+                .filter((p) => p.opaque)
+                .map((p) => `${p.prefix}.${p.contents}`),
+        ],
     };
 }
 
@@ -106,6 +112,54 @@ describe("SugarCube script symbols (ADR-0005)", () => {
             ["$a", "b"],
             ["$a.b", "c"],
         ]);
+    });
+
+    describe("opaque assignments", () => {
+        it("should mark a state-root write of a call's result opaque", () => {
+            expect(
+                extract("State.variables.x = fn(); State.temporary.y = fn();")
+                    .opaque,
+            ).to.eql(["$x", "_y"]);
+        });
+
+        for (const root of [
+            "variables()",
+            "SugarCube.State.variables",
+            "window.SugarCube.State.variables",
+        ]) {
+            it(`should mark a write through ${root} opaque`, () => {
+                expect(extract(`${root}.x = fn();`).opaque).to.eql(["$x"]);
+            });
+        }
+
+        it("should mark a write through an aliased state root opaque", () => {
+            expect(
+                extract("const v = State.variables; v.x = fn();").opaque,
+            ).to.eql(["$x"]);
+        });
+
+        it("should mark a property-path write opaque at the property, not the variable", () => {
+            expect(extract("State.variables.a.b = fn();").opaque).to.eql([
+                "$a.b",
+            ]);
+        });
+
+        it("should judge setVar by its value argument", () => {
+            expect(
+                extract("State.setVar('$x', fn()); State.setVar('$y', 5);")
+                    .opaque,
+            ).to.eql(["$x"]);
+        });
+
+        it("should ignore a self-reference through any state root", () => {
+            expect(
+                extract(
+                    "variables().inv = variables().inv || {};" +
+                        "const v = State.variables; v.bag = State.variables.bag || {};" +
+                        "State.setVar('$pack', State.getVar('$pack') ?? {});",
+                ).opaque,
+            ).to.eql([]);
+        });
     });
 
     it("should ignore bare names, declarations, UMD names and shadowed roots", () => {
