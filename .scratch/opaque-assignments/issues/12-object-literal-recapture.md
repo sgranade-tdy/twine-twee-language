@@ -4,11 +4,11 @@
 
 **Blocked by:** none
 
-**Status:** open
+**Status:** done
 
-- [ ] Each assigned or declared object literal is captured once, from its owning `AssignmentExpression` (`x = {…}`, `x.a.b = {…}`) or `VariableDeclarator` (`var x = {…}`)
-- [ ] Nested literals (`x = {a: {b: 1}}`) are still captured through the outer one, and a literal nested in a non-literal value (`x = f({a: 1})`) still isn't
-- [ ] The existing suite passes unchanged
+- [x] Each assigned or declared object literal is captured once, from its owning `AssignmentExpression` (`x = {…}`, `x.a.b = {…}`) or `VariableDeclarator` (`var x = {…}`)
+- [x] Nested literals (`x = {a: {b: 1}}`) are still captured through the outer one, and a literal nested in a non-literal value (`x = f({a: 1})`) still isn't
+- [x] The existing suite passes unchanged
 
 ## Comments
 
