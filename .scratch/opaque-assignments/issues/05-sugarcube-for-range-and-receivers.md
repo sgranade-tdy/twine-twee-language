@@ -13,5 +13,7 @@
 ## Comments
 
 - Receivers are handled once, in the generic `receiver` argument type, so every built-in receiver macro and any custom macro (via `t3lt.twee-config`) that declares a `receiver` argument is opaque.
-- In a back-ticked receiver expression, every reference is already treated as a write, so every reference is also opaque (`` `$a[_i]` `` makes `_i` opaque too). Such receivers are rare enough that we don't distinguish the written target from index expressions.
+- A receiver is parsed as the target of an assignment, so only the path it writes is opaque. A quoted `"$p.stats"` reads `$p` and makes `$p.stats` opaque; in `` `$a[_i]` ``, `_i` is a read, not opaque.
+- A back-ticked receiver that can't be an assignment target (`` `"$" + _name` ``) builds the name at runtime, so we can't tell what it writes. Its references are all reads, and nothing is opaque.
 - In `<<for>>`, the collection expression after `range` stays an ordinary read.
+- The range form accepts `_k,_v` with no space after the comma, matching SugarCube's own `\s*,\s*`.

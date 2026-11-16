@@ -168,6 +168,22 @@ export interface TokenizedJS {
 }
 
 /**
+ * Mark every variable and property in tokenized JavaScript as written.
+ *
+ * @param tokens Tokenized JavaScript to mark in place.
+ * @param options.opaque True to also mark every write opaque.
+ */
+export function markAllWritten(
+    tokens: TokenizedJS,
+    { opaque = false }: { opaque?: boolean } = {},
+): void {
+    for (const label of [...tokens.variables, ...tokens.properties]) {
+        label.assigned = true;
+        if (opaque) label.opaque = true;
+    }
+}
+
+/**
  * JavaScript global names.
  *
  * Note that browser and library globals come from story formats,

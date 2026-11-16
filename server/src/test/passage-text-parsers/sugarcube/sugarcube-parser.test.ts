@@ -3406,6 +3406,38 @@ describe("SugarCube Parser", () => {
                 ]);
             });
 
+            it("should capture a quoted receiver's property path as a variable read and an opaque property write", () => {
+                const header = ":: Passage\n";
+                const passage = "Let's go: <<a bare '$p.stats'>>\n";
+                const callbacks = new MockCallbacks();
+                const state = buildParsingState({
+                    content: header + passage,
+                    callbacks: callbacks,
+                });
+                const macro = buildMacroInfoWithArgs({
+                    name: "a",
+                    args: ["bareword &+ receiver"],
+                });
+                const parser = uut.getSugarCubeParser(undefined, {
+                    allMacros: () => {
+                        return { a: macro };
+                    },
+                    allMacroEnums: () => {
+                        return {};
+                    },
+                });
+
+                parser?.parsePassageText(passage, header.length, state);
+                const results = callbacks.references
+                    .slice(1)
+                    .map((r) => [r.contents, r.kind, r.opaque]);
+
+                expect(results).to.eql([
+                    ["$p", OSugarCubeSymbolKind.Variable, undefined],
+                    ["$p.stats", OSugarCubeSymbolKind.PropertySet, true],
+                ]);
+            });
+
             it("should capture set variables for receiver values in backticks", () => {
                 const header = ":: Passage\n";
                 const passage = "Let's go: <<a bare `$testy`>>\n";

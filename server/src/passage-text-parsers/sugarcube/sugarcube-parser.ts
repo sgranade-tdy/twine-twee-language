@@ -1,10 +1,14 @@
 import { Range } from "vscode-languageserver";
 
 import { DiagnosticCodes } from "@tt3/shared";
-import { capturePreSemanticTokenFor, ParsingState } from "../types";
+import {
+    capturePreSemanticTokenFor,
+    ParsingState,
+    StoryFormatParsingState,
+} from "../types";
 import { createDiagnosticFromRange } from "../../diagnostics";
 import { EmbeddedDocument } from "../../embedded-languages";
-import { tokenizeJavaScript } from "../../js-parser";
+import { TokenizedJS, tokenizeJavaScript } from "../../js-parser";
 import {
     createSymbolFor,
     findAndParseHtml,
@@ -311,6 +315,59 @@ const macroInASetterRegex = new RegExp(
 );
 
 /**
+ * Tokenize a receiver as the target of an opaque assignment.
+ *
+ * Only the path the receiver writes is marked written and opaque. Anything
+ * else inside it, like an index variable in `$a[_i]`, stays a read.
+ *
+ * @param receiver Receiver text, without quotes or back-ticks.
+ * @param at Index of the receiver in the larger document (zero-based).
+ * @param state Parsing state.
+ * @param sugarcubeState SugarCube-specific parsing state.
+ * @returns Tokenized receiver, or undefined if it can't be an assignment target.
+ */
+function tokenizeReceiverTarget(
+    receiver: string,
+    at: number,
+    state: ParsingState,
+    sugarcubeState: SugarCubeParsingState,
+): TokenizedJS | undefined {
+    // Let the parser find the written path by assigning to the receiver.
+    // The stand-in value adds no references, and its semantic tokens
+    // (like the `=` operator) are dropped as they're outside the receiver.
+    const scratchState: StoryFormatParsingState = {
+        passageTokens: {},
+        hostGlobals: sugarcubeState.hostGlobals,
+    };
+    const tokens = tokenizeTwineScriptExpression(
+        `${receiver}={}`,
+        at,
+        state.textDocument,
+        scratchState,
+        { isSetterContext: true },
+    );
+    if (tokens.error !== undefined) return undefined;
+
+    const end = at + receiver.length;
+    for (const t of Object.values(scratchState.passageTokens)) {
+        if (t.at < end) {
+            capturePreSemanticTokenFor(
+                t.text,
+                t.at,
+                t.type,
+                t.modifiers,
+                sugarcubeState,
+            );
+        }
+    }
+    // Receivers are opaque: we don't model each macro's value
+    for (const label of [...tokens.variables, ...tokens.properties]) {
+        if (label.assigned) label.opaque = true;
+    }
+    return tokens;
+}
+
+/**
  * Parse the arguments to a macro.
  *
  * @param macroName The name of the macro being parsed.
@@ -452,39 +509,49 @@ function parseMacroArgs(
                 if (t3ltArg.type === T3LTArgType.String) {
                     const varName = sc2Token.text.slice(1, -1);
                     const varAt = sc2Token.at + 1;
-                    // variable
-                    // Receivers are opaque: we don't model each macro's value
-                    state.callbacks.onSymbolReference({
-                        ...createSymbolFor(
-                            varName,
-                            varAt,
-                            OSugarCubeSymbolKind.VariableSet,
-                            state.textDocument,
-                        ),
-                        opaque: true,
-                    });
-                    capturePreSemanticTokenFor(
+                    const tokens = tokenizeReceiverTarget(
                         varName,
                         varAt,
-                        ETokenType.variable,
-                        [],
+                        state,
                         sugarcubeState,
                     );
+                    if (tokens !== undefined) {
+                        createVariableAndPropertyReferences(
+                            tokens,
+                            state,
+                            sugarcubeState,
+                        );
+                    } else {
+                        // Receivers are opaque: we don't model each macro's value
+                        state.callbacks.onSymbolReference({
+                            ...createSymbolFor(
+                                varName,
+                                varAt,
+                                OSugarCubeSymbolKind.VariableSet,
+                                state.textDocument,
+                            ),
+                            opaque: true,
+                        });
+                        capturePreSemanticTokenFor(
+                            varName,
+                            varAt,
+                            ETokenType.variable,
+                            [],
+                            sugarcubeState,
+                        );
+                    }
                 } else {
-                    let tokens;
                     // Non-string receivers are okay, but often are a mistake
                     // (see https://github.com/cyrusfirheir/twee3-language-tools/issues/65).
                     // We'll suggest that they should be in back-ticks if they're not
+                    let receiver = sc2Token.text;
+                    let receiverAt = sc2Token.at;
                     if (
-                        sc2Token.text[0] === "`" &&
-                        sc2Token.text[sc2Token.text.length - 1] === "`"
+                        receiver[0] === "`" &&
+                        receiver[receiver.length - 1] === "`"
                     ) {
-                        tokens = tokenizeTwineScriptExpression(
-                            sc2Token.text.slice(1, -1),
-                            sc2Token.at + 1,
-                            state.textDocument,
-                            sugarcubeState,
-                        );
+                        receiver = receiver.slice(1, -1);
+                        receiverAt++;
                     } else {
                         logDiagnosticFor(
                             DiagnosticCodes.SugarCubeUnexpectedBareVariable,
@@ -494,22 +561,22 @@ function parseMacroArgs(
                             "Do you mean for this receiver value to be a bare variable? " +
                                 `If so, consider surrounding it with back-ticks: \`${sc2Token.text}\``,
                         );
-                        tokens = tokenizeTwineScriptExpression(
-                            sc2Token.text,
-                            sc2Token.at,
+                    }
+                    // An expression that can't be an assignment target
+                    // (like `"$" + _name`) has nothing we can tell is written
+                    const tokens =
+                        tokenizeReceiverTarget(
+                            receiver,
+                            receiverAt,
+                            state,
+                            sugarcubeState,
+                        ) ??
+                        tokenizeTwineScriptExpression(
+                            receiver,
+                            receiverAt,
                             state.textDocument,
                             sugarcubeState,
                         );
-                    }
-                    // All references in a receiver are actually opaque assignments
-                    for (const v of tokens.variables) {
-                        v.assigned = true;
-                        v.opaque = true;
-                    }
-                    for (const p of tokens.properties) {
-                        p.assigned = true;
-                        p.opaque = true;
-                    }
                     createVariableAndPropertyReferences(
                         tokens,
                         state,
