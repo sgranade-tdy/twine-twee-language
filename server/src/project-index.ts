@@ -82,8 +82,9 @@ export function shorthandFlag(source: Shorthand): Shorthand {
 }
 
 /**
- * Tracks whether an assignment is an opaque assignment: one whose value
- * could be an object of unknown shape.
+ * Tracks an assignment's value shape: whether it's an opaque assignment (one
+ * whose value could be an object of unknown shape), and, if it copies story
+ * state, its shape sources.
  */
 export interface Opaque {
     /**
@@ -91,14 +92,25 @@ export interface Opaque {
      * beneath its path are never reported as never set.
      */
     opaque?: boolean;
+    /**
+     * Story paths whose shape the assigned value copies (`$player` in
+     * `_p = $player`). Properties beneath the assigned path are checked
+     * against them.
+     */
+    shapeSources?: string[];
 }
 
 /**
- * Spread-ready `opaque` flag that's absent unless true, keeping indexed
- * shapes sparse.
+ * Spread-ready `opaque` flag and shape sources that are absent unless set,
+ * keeping indexed shapes sparse.
  */
 export function opaqueFlag(source: Opaque): Opaque {
-    return source.opaque ? { opaque: true } : {};
+    return {
+        ...(source.opaque ? { opaque: true } : {}),
+        ...(source.shapeSources?.length
+            ? { shapeSources: source.shapeSources }
+            : {}),
+    };
 }
 
 /**

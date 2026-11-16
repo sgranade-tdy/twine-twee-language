@@ -800,7 +800,7 @@ describe("JS Parser", () => {
                     ),
                     prefix: "var1.rootprop1.rootprop2",
                     assigned: true,
-                    opaque: true,
+                    shapeSources: ["val1"],
                 },
                 {
                     contents: "prop2",
@@ -864,7 +864,7 @@ describe("JS Parser", () => {
                     ),
                     prefix: "var1.rootprop1.rootprop2",
                     assigned: true,
-                    opaque: true,
+                    shapeSources: ["val1"],
                 },
                 {
                     contents: "prop2",
@@ -3012,8 +3012,8 @@ describe("JS Parser", () => {
         });
 
         for (const [desc, code] of [
-            ["an identifier", "x = y"],
-            ["member access", "x = setup.items.sword"],
+            ["a local binding", "function f(y) { x = y }"],
+            ["a global's property", "x = Math.PI"],
             ["element access", "x = arr[0]"],
             ["a new expression", "x = new Date()"],
             ["this", "function f() { x = this }"],
@@ -3023,8 +3023,8 @@ describe("JS Parser", () => {
             ["a chained assignment of an opaque value", "x = y = fn()"],
             ["a sequence ending in an opaque value", "x = (1, fn())"],
             ["a conditional with an opaque branch", "x = c ? fn() : 1"],
-            ["an || with an opaque operand", "x = 1 || y"],
-            ["a ?? with an opaque operand", "x = y ?? {}"],
+            ["an || with an opaque operand", "x = 1 || fn()"],
+            ["a ?? with an opaque operand", "x = fn() ?? {}"],
         ]) {
             it(`should mark a variable assigned ${desc} as opaque`, () => {
                 const result = tokenize(code, true);
@@ -3060,7 +3060,7 @@ describe("JS Parser", () => {
         });
 
         it("should mark a variable assigned an object literal with a spread as opaque", () => {
-            const result = tokenize("x = {...y, a: 1}", true);
+            const result = tokenize("x = {...fn(), a: 1}", true);
 
             expect(result.variables.find((v) => v.contents === "x")?.opaque).to
                 .be.true;
@@ -3088,7 +3088,7 @@ describe("JS Parser", () => {
         });
 
         it("should mark a nested object literal's key holding a spread as opaque", () => {
-            const result = tokenize("x.y = {a: {...z}}", true);
+            const result = tokenize("x.y = {a: {...z()}}", true);
 
             expect(
                 result.properties
@@ -3121,6 +3121,60 @@ describe("JS Parser", () => {
 
             expect(result.variables.find((v) => v.contents === "a")?.opaque).to
                 .be.undefined;
+        });
+
+        describe("shape sources", () => {
+            const shapeOf = (code: string, name = "x") => {
+                const result = tokenize(code, true);
+                const label = [...result.variables, ...result.properties].find(
+                    (l) => l.contents === name && l.assigned,
+                );
+                return [label?.opaque, label?.shapeSources];
+            };
+
+            for (const [desc, code, source] of [
+                ["a story variable", "x = y", "y"],
+                ["a story property chain", "x = y.a['b']", "y.a.b"],
+                ["a clone of a story variable", "x = clone(y.a)", "y.a"],
+            ]) {
+                it(`should record ${desc} as a shape source`, () => {
+                    expect(shapeOf(code)).to.eql([undefined, [source]]);
+                });
+            }
+
+            it("should record each spread of a copy as a shape source", () => {
+                expect(shapeOf("x = {...y, ...z.a, b: 1}")).to.eql([
+                    undefined,
+                    ["y", "z.a"],
+                ]);
+            });
+
+            it("should unite the shape sources of a conditional's branches", () => {
+                expect(shapeOf("x = c ? y : z || {}")).to.eql([
+                    undefined,
+                    ["y", "z"],
+                ]);
+            });
+
+            it("should record a copy assigned to an object literal's key", () => {
+                expect(shapeOf("x = {a: y}", "a")).to.eql([undefined, ["y"]]);
+            });
+
+            for (const code of [
+                "x = y[i]",
+                "x = y[0]",
+                "x = {...y, ...fn()}",
+                "x = c ? y : fn()",
+                "x = clone(fn())",
+            ]) {
+                it(`should mark \`${code}\` opaque instead of recording a shape source`, () => {
+                    expect(shapeOf(code)).to.eql([true, undefined]);
+                });
+            }
+
+            it("should mark a target destructured from a copy opaque", () => {
+                expect(shapeOf("[x] = y")).to.eql([true, undefined]);
+            });
         });
 
         for (const code of [

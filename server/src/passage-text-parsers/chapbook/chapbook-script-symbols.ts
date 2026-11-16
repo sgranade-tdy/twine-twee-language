@@ -3,7 +3,7 @@ import * as acornWalk from "acorn-walk";
 
 import {
     isEcmaScriptGlobal,
-    isOpaqueArgument,
+    argumentShape,
     ScriptPropertyOccurrence,
     ScriptSymbolExtractor,
     ScriptVariableOccurrence,
@@ -123,18 +123,16 @@ export function createChapbookScriptExtractor({
             if (!segments.every((s) => isIdentifierName(s))) return;
 
             const assigned = method !== "get";
-            const opaque =
-                assigned &&
-                isOpaqueArgument(
-                    (node as acorn.CallExpression).arguments[1],
-                    key.name,
-                    statePathOf,
-                );
+            const shape = assigned
+                ? argumentShape(
+                      (node as acorn.CallExpression).arguments[1],
+                      key.name,
+                      statePathOf,
+                  )
+                : {};
             let at = key.start;
             segments.forEach((segment, i) => {
-                const flag = opaqueFlag({
-                    opaque: opaque && i === segments.length - 1,
-                });
+                const flag = opaqueFlag(i === segments.length - 1 ? shape : {});
                 if (i === 0) {
                     variables.push({ text: segment, at, assigned, ...flag });
                 } else {

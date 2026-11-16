@@ -75,7 +75,7 @@ A missed typo surprises authors less than a warning they can't fix.
 - **Flow-insensitive, project-wide**: an opaque assignment anywhere makes the
   path opaque everywhere, regardless of order or reachability. This matches how
   the index already treats writes.
-- **Opaque wins**: if `$player` gets both `{hp: 10}` and `clone($saved)`,
+- **Opaque wins**: if `$player` gets both `{hp: 10}` and `loadSave()`,
   `$player.*` is silenced, `$player.hpp` included.
 - **Descendants only**: an opaque `$a.b` silences `$a.b.c.d`. It doesn't
   silence `$a.b` itself, `$a`, or siblings like `$a.x`.
@@ -97,13 +97,16 @@ Rather than marking them opaque, they record a **shape source** (GLOSSARY).
 - **Union**: a path may have several shape sources. A property beneath it is
   set if any source (or the path's own writes) sets it. If any source is
   opaque, the path is opaque ("opaque wins").
+- **Branches**: a conditional or logical value (`c ? $a : $b`, `$a || {}`)
+  unites its branches' shape sources, with opaque winning as usual.
+- **Built-ins**: a copy of a story format's built-in (`setup.items.sword`) is
+  opaque, since the format sets its properties where the index can't see.
 - **Chains** resolve transitively (`_q` ← `_p` ← `$player`). Cycles resolve to
   opaque.
 - **Descendants**: `_p.a.b` is checked as `$player.a.b`.
 - **Diagnostics only**: find-references, go-to-definition and rename don't
   follow shape sources. After renaming `$player.hp`, a now-unbacked `_p.hp`
   starts warning, which surfaces the stale read.
-- Until the shape-source ticket lands, these cases are opaque.
 
 ## Rejected Alternatives
 

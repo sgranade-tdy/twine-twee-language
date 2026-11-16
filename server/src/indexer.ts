@@ -57,7 +57,7 @@ class IndexingState {
 function collateReferences(symbols: ProjSymbol[]): References[] {
     const referencesMap: Record<string, References> = {};
     for (const symbol of symbols) {
-        const key = `${symbol.kind},${symbol.contents},${!!symbol.isCallee},${!!symbol.sigilOutsideRange},${!!symbol.shorthand},${!!symbol.opaque}`;
+        const key = `${symbol.kind},${symbol.contents},${!!symbol.isCallee},${!!symbol.sigilOutsideRange},${!!symbol.shorthand},${!!symbol.opaque},${symbol.shapeSources?.join(",") ?? ""}`;
         const ref = referencesMap[key] || {
             contents: symbol.contents,
             locations: [],

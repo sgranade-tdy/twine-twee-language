@@ -9,7 +9,7 @@ import type { AcornSyntaxError } from "../../acorn-errors";
 import { createDiagnosticFor } from "../../diagnostics";
 import { EmbeddedDocument } from "../../embedded-languages";
 import {
-    isOpaqueValueText,
+    valueTextShape,
     markAllWritten,
     parseJSStrict,
     TokenizedJS,
@@ -27,7 +27,12 @@ import {
     parsePassageReference,
 } from "../../parser";
 import { ParseLevel } from "../../parser-types";
-import { calleeFlag, opaqueFlag, ProjectIndex } from "../../project-index";
+import {
+    calleeFlag,
+    Opaque,
+    opaqueFlag,
+    ProjectIndex,
+} from "../../project-index";
 import { ETokenType, ETokenModifier } from "../../semantic-tokens";
 import { Token, TwineDiagnostic } from "../../types";
 import {
@@ -96,17 +101,24 @@ export function getChapbookDefinitions(
 }
 
 /**
- * Mark the variable or property with a given path opaque.
+ * Give the variable or property with a given path the shape of its value.
  *
- * @param jsTokens Tokenized variables and properties to mark in place.
- * @param path Full dotted path to mark.
+ * @param jsTokens Tokenized variables and properties to update in place.
+ * @param path Full dotted path to update.
+ * @param shape Shape of the value assigned to the path.
  */
-function markPathOpaque(jsTokens: TokenizedJS, path: string): void {
+function setPathShape(
+    jsTokens: TokenizedJS,
+    path: string,
+    shape: Opaque,
+): void {
     for (const v of jsTokens.variables) {
-        if (v.contents === path) v.opaque = true;
+        if (v.contents === path) Object.assign(v, opaqueFlag(shape));
     }
     for (const p of jsTokens.properties) {
-        if (`${p.prefix}.${p.contents}` === path) p.opaque = true;
+        if (`${p.prefix}.${p.contents}` === path) {
+            Object.assign(p, opaqueFlag(shape));
+        }
     }
 }
 
@@ -2299,9 +2311,11 @@ function parseVarsSection(
             state.textDocument,
             chapbookState,
         );
-        if (isOpaqueValueText(value, name)) {
-            markPathOpaque(nameTokens, name);
-        }
+        setPathShape(
+            nameTokens,
+            name,
+            valueTextShape(value, name, chapbookState.hostGlobals),
+        );
         createVariableAndPropertyReferences(nameTokens, state, true);
         // Capture tokens for variables and properties
         const varsAndProps = name.split(".");
