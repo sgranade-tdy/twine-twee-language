@@ -3401,6 +3401,7 @@ describe("SugarCube Parser", () => {
                             Range.create(1, 20, 1, 26),
                         ),
                         kind: OSugarCubeSymbolKind.VariableSet,
+                        opaque: true,
                     },
                 ]);
             });
@@ -3437,6 +3438,7 @@ describe("SugarCube Parser", () => {
                             Range.create(1, 20, 1, 26),
                         ),
                         kind: OSugarCubeSymbolKind.VariableSet,
+                        opaque: true,
                     },
                 ]);
             });

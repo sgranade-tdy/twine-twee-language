@@ -453,14 +453,16 @@ function parseMacroArgs(
                     const varName = sc2Token.text.slice(1, -1);
                     const varAt = sc2Token.at + 1;
                     // variable
-                    state.callbacks.onSymbolReference(
-                        createSymbolFor(
+                    // Receivers are opaque: we don't model each macro's value
+                    state.callbacks.onSymbolReference({
+                        ...createSymbolFor(
                             varName,
                             varAt,
                             OSugarCubeSymbolKind.VariableSet,
                             state.textDocument,
                         ),
-                    );
+                        opaque: true,
+                    });
                     capturePreSemanticTokenFor(
                         varName,
                         varAt,
@@ -499,12 +501,14 @@ function parseMacroArgs(
                             sugarcubeState,
                         );
                     }
-                    // All references in a receiver are actually assignments
+                    // All references in a receiver are actually opaque assignments
                     for (const v of tokens.variables) {
                         v.assigned = true;
+                        v.opaque = true;
                     }
                     for (const p of tokens.properties) {
                         p.assigned = true;
+                        p.opaque = true;
                     }
                     createVariableAndPropertyReferences(
                         tokens,

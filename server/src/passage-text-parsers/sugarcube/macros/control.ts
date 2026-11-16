@@ -140,6 +140,13 @@ export const forMacro: MacroInfo = {
                         state.textDocument,
                         sugarcubeState,
                     );
+                    // The value variable holds collection members of unknown shape
+                    for (const v of valueTokens.variables) {
+                        v.opaque = true;
+                    }
+                    for (const p of valueTokens.properties) {
+                        p.opaque = true;
+                    }
                     jsTokens.variables = [
                         ...jsTokens.variables,
                         ...valueTokens.variables,

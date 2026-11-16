@@ -373,5 +373,40 @@ describe("Validator", () => {
 
             expect(result).to.eql(["typo"]);
         });
+
+        it("should not warn on a property of a <<for>> range's value variable", async () => {
+            const result = await neverSetIn(
+                "<<for _item range $list>><</for>>",
+                "<<print _item.name>>",
+            );
+
+            expect(result).to.be.empty;
+        });
+
+        it("should warn on a property of a <<for>> range's key variable", async () => {
+            const result = await neverSetIn(
+                "<<for _k, _v range $obj>><</for>>",
+                "<<print _k.foo + _v.bar>>",
+            );
+
+            expect(result).to.eql(["foo"]);
+        });
+
+        for (const setText of [
+            `<<checkbox "$r" false true>>`,
+            `<<cycle "$r">><<option "a">><</cycle>>`,
+            `<<listbox "$r">><<option "a">><</listbox>>`,
+            `<<numberbox "$r" 0>>`,
+            `<<radiobutton "$r" 1>>`,
+            `<<textarea "$r" "">>`,
+            `<<textbox "$r" "">>`,
+            '<<textbox `$r` "">>',
+        ]) {
+            it(`should not warn on a property of the receiver in ${setText}`, async () => {
+                const result = await neverSetIn(setText, "<<print $r.x>>");
+
+                expect(result).to.be.empty;
+            });
+        }
     });
 });
